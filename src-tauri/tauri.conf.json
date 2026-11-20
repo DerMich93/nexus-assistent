@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Nexus Assistent",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "identifier": "de.nexus.assistant",
   "build": {
     "frontendDist": "../web"
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Nexus Assistent 1.0",
+        "title": "Nexus Assistent 1.2",
         "width": 1440,
         "height": 900,
         "minWidth": 900,

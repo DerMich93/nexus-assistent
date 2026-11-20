@@ -8,12 +8,12 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="assets/nexus-icon-192.png">
   <link rel="apple-touch-icon" href="assets/nexus-icon-192.png">
-  <title>Nexus Assistent 1.0</title>
+  <title>Nexus Assistent 1.2</title>
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <main class="app-container" id="app">
-    <div class="top-actions"><button class="btn secondary" id="automationButton" type="button">Automatisierungen</button><button class="btn secondary" id="tasksButton" type="button">Aufgaben</button><button class="btn secondary" id="calendarButton" type="button">Kalender</button><button class="btn secondary" id="newChatButton" type="button">Neues Gespräch</button><button class="btn secondary" id="historyButton" type="button">Gesprächsverlauf</button><button class="btn secondary" id="memoryButton" type="button">Gedächtnis</button><button class="btn secondary" id="aiSettingsButton" type="button">⚙ KI-Verwaltung</button><button class="btn secondary" id="backupButton" type="button">Datensicherung</button></div>
+    <div class="top-actions"><button class="btn secondary" id="automationButton" type="button">Automatisierungen</button><button class="btn secondary" id="tasksButton" type="button">Aufgaben</button><button class="btn secondary" id="calendarButton" type="button">Kalender</button><button class="btn secondary" id="filesButton" type="button">Arbeitsordner</button><button class="btn secondary" id="newChatButton" type="button">Neues Gespräch</button><button class="btn secondary" id="historyButton" type="button">Gesprächsverlauf</button><button class="btn secondary" id="memoryButton" type="button">Gedächtnis</button><button class="btn secondary" id="aiSettingsButton" type="button">⚙ KI-Verwaltung</button><button class="btn secondary" id="backupButton" type="button">Datensicherung</button></div>
     <aside class="sidebar left">
       <h1>Nexus</h1><div class="subtitle">PERSONAL AI ASSISTANT</div>
       <div class="brand-line"></div>
@@ -44,6 +44,8 @@
     </aside>
 
     <div class="input-area">
+      <button class="btn secondary attach-btn" id="attachButton" type="button" title="Datei aus dem Arbeitsordner anhängen" aria-label="Datei anhängen">📎</button>
+      <div class="attachment-chip" id="attachmentChip" hidden><span id="attachmentName"></span><button type="button" id="attachmentRemove" title="Anhang entfernen" aria-label="Anhang entfernen">✕</button></div>
       <input type="text" id="userInput" placeholder="Ihre Nachricht an Nexus ..." autocomplete="off" aria-label="Nachricht">
       <button class="btn" id="sendButton" type="button">Senden</button>
       <button class="btn voice" id="voiceButton" type="button" aria-pressed="false">Voice: AUS</button>
@@ -87,6 +89,31 @@
       <div id="ollamaWrap" hidden>
         <label class="field-label" for="ollamaUrl">Ollama-Adresse</label>
         <input id="ollamaUrl" type="url" value="http://localhost:11434" placeholder="http://localhost:11434">
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Modell-Zentrale (automatische KI-Auswahl)</div>
+        <label class="privacy-toggle"><input type="checkbox" id="routerToggle"><span>Automatisch die passende KI wählen und bei Limit oder Ausfall zur nächsten wechseln. Der Anbieter oben bleibt dann nur für „Verbindung testen“. Von Hand wählen: Nachricht mit @groq, @mistral, @gemini, @lokal, @claude oder @openai beginnen.</span></label>
+        <div id="routerProviders"></div>
+        <label class="privacy-toggle"><input type="checkbox" id="mistralNoTrainingToggle"><span>Mistral: Ich habe das Datentraining abgeschaltet (Mistral Admin-Konsole → Privacy). Erst dann gilt Mistral als 🟢.</span></label>
+        <label class="privacy-toggle"><input type="checkbox" id="googleBillingToggle"><span>Gemini: Mein Google-Projekt hat ein aktives Abrechnungskonto (dann kein Training). Ohne Abrechnung bekommt Gemini nie private Daten.</span></label>
+        <div style="font-size:.78rem;opacity:.75;margin-top:6px">Ranglisten pro Aufgabe (durch Komma getrennt, optional mit Modell, z. B. <code>mistral:codestral-latest</code>). Höchstens 4 Versuche pro Frage. Private Daten (Gedächtnis, Aufgaben, Termine, Dateien) gehen nur an 🟢-Anbieter und nur mit den Freigaben unten.</div>
+        <label class="field-label" for="routerProfile_general">Allgemein</label><input id="routerProfile_general" type="text" spellcheck="false" autocomplete="off"><label class="field-label" for="routerProfile_documents">Dokumente/lange Texte</label><input id="routerProfile_documents" type="text" spellcheck="false" autocomplete="off"><label class="field-label" for="routerProfile_code">Code &amp; Formeln</label><input id="routerProfile_code" type="text" spellcheck="false" autocomplete="off"><label class="field-label" for="routerProfile_research">Recherche</label><input id="routerProfile_research" type="text" spellcheck="false" autocomplete="off">
+        <label class="field-label" for="routerBudget">Monatsbudget für kostenpflichtige KIs (Claude, OpenAI) in €</label>
+        <input id="routerBudget" type="number" min="0" max="1000" step="1" value="0">
+        <div id="routerSpendInfo" style="font-size:.78rem;opacity:.75;margin-top:6px"></div>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Wetter, Feiertage &amp; Persönlichkeit</div>
+        <label class="privacy-toggle"><input type="checkbox" id="weatherToggle" checked><span>Wetter über Open-Meteo abrufen (kostenlos, ohne Key). Gesendet wird nur der Ort.</span></label>
+        <label class="field-label" for="weatherPlace">Heimatort</label>
+        <input id="weatherPlace" type="text" autocomplete="off" placeholder="z. B. Hamburg">
+        <label class="field-label" for="holidayStateSelect">Bundesland für Feiertage</label>
+        <select id="holidayStateSelect"></select>
+        <label class="field-label" for="personaAddress">Anrede</label>
+        <select id="personaAddress"><option value="sie">Sie</option><option value="du">du</option></select>
+        <label class="field-label" for="personaLength">Antwortlänge</label>
+        <select id="personaLength"><option value="kurz">kurz</option><option value="normal">normal</option><option value="ausfuehrlich">ausführlich</option></select>
+        <label class="privacy-toggle"><input type="checkbox" id="personaButler" checked><span>Butler-Ton („Sehr wohl“, britischer Charme)</span></label>
       </div>
       <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
         <label class="field-label" for="sttModeSelect">Spracheingabe (Mikrofon)</label>
@@ -142,9 +169,21 @@
       <label class="privacy-toggle"><input type="checkbox" id="shareMemoriesToggle"><span>Ich erlaube NEXUS, meine Erinnerungen („Gedächtnis“) bei Anfragen an Cloud-KI-Anbieter mitzuschicken. Standardmäßig deaktiviert.</span></label>
       <label class="privacy-toggle"><input type="checkbox" id="shareTasksToggle"><span>Ich erlaube NEXUS, meine offenen Aufgaben bei Anfragen an Cloud-KI-Anbieter mitzuschicken (damit Fragen wie „Was steht heute an?“ funktionieren). Standardmäßig deaktiviert.</span></label>
       <label class="privacy-toggle"><input type="checkbox" id="shareCalendarToggle"><span>Ich erlaube NEXUS, meine Termine der nächsten 14 Tage bei Anfragen an Cloud-KI-Anbieter mitzuschicken (damit Fragen wie „Habe ich morgen Zeit?“ funktionieren). Standardmäßig deaktiviert.</span></label>
+      <label class="privacy-toggle"><input type="checkbox" id="shareFilesToggle"><span>Ich erlaube NEXUS, Dateien, die ich aus dem Arbeitsordner anhänge, an Cloud-KI-Anbieter zu schicken (als Text). Standardmäßig deaktiviert; bei lokaler KI nicht nötig.</span></label>
       <label class="field-label" for="eventLeadSelect">Erinnerung vor Terminen</label>
       <select id="eventLeadSelect"><option value="0">Zum Beginn</option><option value="5">5 Minuten vorher</option><option value="15">15 Minuten vorher</option><option value="30">30 Minuten vorher</option><option value="60">1 Stunde vorher</option></select>
       <div style="font-size:.78rem;opacity:.75;margin-top:8px">Bei lokaler KI (Ollama oder Server auf localhost) werden Erinnerungen und Aufgaben immer genutzt, weil sie den PC nicht verlassen.</div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Diagnose &amp; Updates</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn secondary" id="diagnoseButton" type="button">Diagnose starten</button>
+          <button class="btn secondary" id="updateCheckButton" type="button">Nach Updates suchen</button>
+          <button class="btn" id="updateInstallButton" type="button" hidden>Update installieren</button>
+        </div>
+        <label class="privacy-toggle"><input type="checkbox" id="updateOnStartToggle" checked><span>Beim Start nach Updates suchen (installiert wird nur auf Klick).</span></label>
+        <div id="updateStatus" style="font-size:.85rem;margin-top:6px"></div>
+        <pre id="diagnoseOutput" class="action-preview" style="min-height:0"></pre>
+      </div>
       <div class="setup-note"><strong>Private Edition – kostenlos nutzbar:</strong> NEXUS erhebt keine Lizenz- oder Abonnementgebühr und enthält keine Werbung. Cloud-KI ist optional und verwendet ausschließlich deinen eigenen API-Key. Der jeweilige Anbieter kann dir API-Nutzung separat berechnen. API-Keys liegen im Windows-Schlüsselbund. Deine Nachrichten werden bei Auswahl einer Cloud-KI an diesen Anbieter übertragen; Erinnerungen nur, wenn du die Freigabe ausdrücklich aktivierst.</div>
       <div class="setup-actions">
         <button class="btn secondary" id="closeSetupButton" type="button">Schließen</button>
@@ -275,6 +314,18 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="filesModal" role="dialog" aria-modal="true" aria-labelledby="filesTitle">
+    <section class="setup-card">
+      <h2 id="filesTitle">NEXUS – Arbeitsordner</h2>
+      <p class="setup-intro">Lege Dateien in diesen Ordner, damit NEXUS sie lesen kann. Neue Dateien von NEXUS landen ebenfalls hier – erst nach deinem Klick auf „Bestätigen“, und vorhandene Dateien werden nie überschrieben. Erlaubt: Word (.docx), Excel (.xlsx), .txt, .md, .csv, .json.</p>
+      <div class="files-path" id="filesPath"></div>
+      <div class="setup-actions"><button class="btn secondary" id="openFolderButton" type="button">Ordner im Explorer öffnen</button><button class="btn secondary" id="refreshFilesButton" type="button">Aktualisieren</button></div>
+      <div class="setup-status" id="filesStatus" aria-live="polite"></div>
+      <div class="memory-list" id="filesList"><div class="memory-empty">Noch keine Dateien im Arbeitsordner.</div></div>
+      <div class="setup-actions"><button class="btn secondary" id="closeFilesButton" type="button">Schließen</button></div>
+    </section>
+  </div>
+
   <div class="modal-backdrop" id="automationModal" role="dialog" aria-modal="true" aria-labelledby="automationTitle">
     <section class="setup-card">
       <h2 id="automationTitle">NEXUS – Automatisierungen</h2>
@@ -320,6 +371,9 @@
   <script src="lib/voice.js"></script>
   <script src="lib/web.js"></script>
   <script src="lib/calendar.js"></script>
+  <script src="lib/office.js"></script>
+  <script src="lib/router.js"></script>
+  <script src="lib/tools.js"></script>
   <script src="ui/core-backup.js"></script>
   <script src="ui/core.js"></script>
   <script src="ui/settings.js"></script>
@@ -331,6 +385,8 @@
   <script src="ui/tasks.js"></script>
   <script src="ui/calendar.js"></script>
   <script src="ui/morning.js"></script>
+  <script src="ui/files.js"></script>
+  <script src="ui/assistant.js"></script>
   <script src="ui/chat.js"></script>
   <script src="ui/voice-input.js"></script>
 </body>

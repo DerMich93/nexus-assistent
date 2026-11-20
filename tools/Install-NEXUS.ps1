@@ -27,7 +27,7 @@ function Winget-Install($id, $override) {
 
 try {
   Write-Host ''
-  Write-Host ' Nexus Assistent 1.0 - Installation' -ForegroundColor Cyan
+  Write-Host ' Nexus Assistent 1.2 - Installation' -ForegroundColor Cyan
   Write-Host ' --------------------' -ForegroundColor Cyan
   Write-Host ' Dieses Fenster richtet alles ein, baut den Nexus Assistenten und startet danach die Installation.'
   Write-Host ' Beim ersten Mal dauert das 15 bis 30 Minuten. Bitte das Fenster offen lassen.'

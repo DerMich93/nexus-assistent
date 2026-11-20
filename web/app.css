@@ -150,3 +150,18 @@
     .cal-editor { margin-top:12px; padding:12px; border:1px solid rgba(0,255,204,.25); border-radius:12px; background:rgba(255,255,255,.03); }
     .cal-row { display:flex; gap:8px; flex-wrap:wrap; }
     .cal-row > * { flex:1; min-width:120px; }
+    /* Arbeitsordner und Dateianhang */
+    .attach-btn { padding: 7px 11px; font-size: 1rem; line-height: 1; }
+    .attachment-chip { display: flex; align-items: center; gap: 6px; max-width: 42%; padding: 5px 6px 5px 11px; border: 1px solid rgba(0,255,204,.35); border-radius: 16px; background: rgba(0,255,204,.08); color: var(--text-main); font-size: .78rem; white-space: nowrap; }
+    .attachment-chip[hidden] { display: none; }
+    .attachment-chip span { overflow: hidden; text-overflow: ellipsis; }
+    .attachment-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: .8rem; padding: 0 4px; }
+    .files-path { font-size: .78rem; opacity: .75; overflow-wrap: anywhere; margin: 4px 0 8px; }
+    .file-meta { font-size: .75rem; opacity: .7; margin-top: 3px; }
+    .action-preview { margin: 8px 0 0; padding: 8px 10px; max-height: 180px; overflow: auto; white-space: pre-wrap; font-family: Consolas, monospace; font-size: .76rem; line-height: 1.4; border-radius: 8px; background: rgba(0,0,0,.28); }
+    /* 1.2: Modell-Zentrale, Sammelbestätigung */
+    .router-row { margin: 8px 0; padding: 8px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; }
+    .router-row .privacy-toggle { margin: 0 0 6px; }
+    .router-key { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+    .router-key input { flex: 1 1 200px; }
+    .action-bulk { display: flex; gap: 8px; margin: 6px 0 12px; flex-wrap: wrap; }

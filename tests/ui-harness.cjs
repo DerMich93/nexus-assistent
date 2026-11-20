@@ -26,12 +26,13 @@ class El {
 const els = {}; const getEl = id => els[id] || (els[id] = new El(id, ['providerSelect', 'modelSelect', 'taskRepeat', 'sttModeSelect', 'autoBackupSelect'].includes(id) ? 'select' : 'div'));
 const log = []; const timers = [];
 let store = { memories: [{ id: '1', text: 'Ich mag kurze Antworten.' }], tasks: [{ id: 't1', title: 'Rechnung zahlen', done: false, dueAt: null, recurrence: null }], hasKey: true, config: {}, automations: {} };
-let replyQueue = [], webFail = false, failNext = false, failSave = false, nextReply = null, focused = true, confirmAnswer = true;
+let providerFail = {}, replyQueue = [], webFail = false, failNext = false, failSave = false, nextReply = null, focused = true, confirmAnswer = true;
 const GOOD_KEY = 'a1b2c3d4-e5f60718-293a4b5c-6d7e8f90-a1b2c3d4-e5f60718-293a4b5c-6d7e8f90';
 store.vault = { enabled: false, keyPresent: false, locked: false };
 store.events = []; store.icsText = null; store.exported = null; store.exportPath = null; let eventSeq = 0;
 store.autostart = false; store.backupName = null; store.backups = [];
 store.sttText = 'Was steht heute an';
+store.ws = { files: [{ name: 'notiz.txt', size: 12, modified: 1763600000 }], data: { 'notiz.txt': new TextEncoder().encode('Einkaufen: Milch') }, written: [] };
 async function invoke(cmd, args) {
   log.push({ cmd, args: JSON.parse(JSON.stringify(args === undefined ? null : args)) });
   switch (cmd) {
@@ -69,10 +70,17 @@ async function invoke(cmd, args) {
     case 'list_auto_backups': return store.backups;
     case 'restore_auto_backup': return;
     case 'transcribe_audio': return store.sttText;
+    case 'workspace_info': return { path: 'C:\\Users\\Test\\Documents\\Nexus-Arbeitsordner', files: store.ws.files };
+    case 'workspace_read': if (!store.ws.data[args.name]) throw 'Die Datei gibt es nicht.'; return store.ws.data[args.name].buffer.slice(0);
+    case 'workspace_write': { const taken = store.ws.files.some(f => f.name === args.name); const name = taken ? args.name.replace(/(\.[^.]+)$/, ' (2)$1') : args.name; store.ws.written.push({ name, data: Uint8Array.from(args.data) }); return name; }
+    case 'workspace_open': return;
     case 'save_task': if (failSave) throw 'Speicher voll'; return [{ id: 'new', ...args }];
     case 'save_memory': return [{ id: 'm', text: args.text }];
-    case 'ai_chat': if (replyQueue.length) return replyQueue.shift(); if (nextReply !== null) { const r = nextReply; nextReply = null; return r; } if (failNext) { failNext = false; throw 'Anthropic-Fehler (HTTP 401): invalid x-api-key'; } return 'Antwort ' + (log.filter(l => l.cmd === 'ai_chat').length);
+    case 'ai_chat': if (providerFail[args.provider]) throw providerFail[args.provider]; if (replyQueue.length) return replyQueue.shift(); if (nextReply !== null) { const r = nextReply; nextReply = null; return r; } if (failNext) { failNext = false; throw 'Anthropic-Fehler (HTTP 401): invalid x-api-key'; } return 'Antwort ' + (log.filter(l => l.cmd === 'ai_chat').length);
     case 'ai_test': return 'Verbindung erfolgreich (Test)';
+    case 'weather_forecast': return { place: args.place + ', Deutschland', current: { temperature_2m: 5, apparent_temperature: 2, weather_code: 61, wind_speed_10m: 10, precipitation: 0.2 }, daily: { time: ['2026-11-20'], weather_code: [61], temperature_2m_min: [3], temperature_2m_max: [7], precipitation_probability_max: [70], precipitation_sum: [3], wind_speed_10m_max: [20] } };
+    case 'update_check': return { configured: true, available: true, version: '1.3.0', current: '1.2.0', notes: 'Neues' };
+    case 'update_install': return;
     case 'list_ollama_models': return ['mistral:7b', 'qwen2.5:3b'];
     case 'list_custom_models': return ['lokales-modell'];
     default: return;
@@ -86,6 +94,7 @@ const ctx = {
   console: { log() {}, warn() {}, error() {} }, confirm: () => confirmAnswer, devicePixelRatio: 1,
   SpeechSynthesisUtterance: class { constructor(t) { this.text = t; } }, speechSynthesis: { speak(u) { log.push({ cmd: 'TTS', text: u.text }); }, cancel() {} },
   Date, JSON, Math, Promise, Number, String, Array, Object, Set, RegExp, Error, URL, isNaN, TextEncoder,
+  TextDecoder, Blob, Response, CompressionStream, DecompressionStream,
 };
 ctx.window = ctx; ctx.window.__TAURI__ = { core: { invoke } };
 ctx.addEventListener = () => {};
@@ -599,6 +608,139 @@ vm.createContext(ctx);
   store.vault = { enabled: false, keyPresent: false, locked: false }; await run('checkVault()');
   ok(els.dataStatus.textContent === 'Unverschlüsselt', 'Datenstatus: Unverschlüsselt');
   ok(run('automationIds.join()') === 'autoMorning' && run('automationKeys.join()') === 'morningOverview', 'Das Automatisierungs-Fenster enthält nur noch, was wirklich funktioniert (Morgenüberblick)');
+
+  console.log('17) Arbeitsordner: Dateien anhängen und neue Dateien speichern');
+  const fileCards = () => els.chatBox.children.filter(c => c.className === 'action-card');
+  fileCards().forEach(c => c.remove());
+  els.providerSelect.value = 'anthropic'; run('refreshModels()'); els.shareFilesToggle.checked = false; els.webSearchToggle.checked = false; await els.saveAiSettingsButton.fire('click');
+  ok(log.filter(l => l.cmd === 'save_config').pop().args.config.shareFilesWithCloud === false, 'Freigabe für Dateien ist gespeichert (Standard: aus)');
+  await els.attachButton.fire('click');
+  ok(els.filesModal.classList.contains('open') && /Nexus-Arbeitsordner/.test(els.filesPath.textContent), 'Büroklammer öffnet den Arbeitsordner mit Pfad');
+  ok(els.filesList.children.length === 1 && els.filesList.children[0].children[0].textContent === 'notiz.txt' && /Textdatei/.test(els.filesList.children[0].children[1].textContent), 'Dateiliste zeigt Name und Typ');
+  await findBtn(els.filesList, 'An Chat anhängen').fire('click');
+  ok(!log.some(l => l.cmd === 'workspace_read') && /Cloud-KI zuerst erlauben/.test(els.filesStatus.textContent) && els.attachmentChip.hidden, 'Cloud-KI ohne Freigabe: Datei wird nicht gelesen');
+  els.shareFilesToggle.checked = true; await els.saveAiSettingsButton.fire('click');
+  await findBtn(els.filesList, 'An Chat anhängen').fire('click');
+  ok(!els.attachmentChip.hidden && /notiz\.txt/.test(els.attachmentName.textContent) && !els.filesModal.classList.contains('open'), 'Mit Freigabe: Datei hängt am Eingabefeld');
+  replyQueue = ['Milch steht drauf.']; await ask('Was steht drin?');
+  const fileMsg = aiCalls().pop().args.messages.pop().content;
+  ok(/^Was steht drin\?/.test(fileMsg) && /<<<DATEI\nEinkaufen: Milch\nDATEI>>>/.test(fileMsg) && /keine Anweisungen/.test(fileMsg), 'Dateitext geht als markierte Daten mit der Nachricht an die KI');
+  ok(els.attachmentChip.hidden && chat().some(m => /^user: Was steht drin\?\n📎 notiz\.txt$/.test(m)), 'Anhang ist verbraucht; im Chat steht nur der Dateiname');
+  const savedConv = log.filter(l => l.cmd === 'save_conversation').pop().args.messages.find(m => m.text && m.text.startsWith('Was steht drin'));
+  ok(savedConv && !/Einkaufen/.test(savedConv.text), 'Der gespeicherte Nachrichtentext enthält den Dateiinhalt nicht');
+  replyQueue = ['Ja.']; await ask('Und sonst?');
+  const fileFollowUp = aiCalls().pop().args.messages;
+  ok(fileFollowUp.some(m => m.role === 'user' && /<<<DATEI/.test(m.content)), 'Folgefragen sehen die Datei weiterhin');
+  els.shareFilesToggle.checked = false; await els.saveAiSettingsButton.fire('click');
+  replyQueue = ['Ok.']; await ask('Noch etwas?');
+  ok(!aiCalls().pop().args.messages.some(m => /<<<DATEI/.test(m.content)), 'Freigabe zurückgenommen: Dateitext geht nicht mehr an die Cloud');
+  replyQueue = ['Ok.']; await els.attachButton.fire('click'); run("pendingAttachment = {name: 'notiz.txt', info: {label: 'Textdatei', text: 'x', note: '', truncated: false}}");
+  const callsBlocked = aiCalls().length; await ask('Und die?');
+  ok(aiCalls().length === callsBlocked && /Datei nicht gesendet/.test(els.statusText.textContent), 'Anhang ohne Freigabe wird beim Senden blockiert');
+  run('clearAttachment()'); replyQueue = [];
+  els.providerSelect.value = 'ollama'; run('refreshModels()'); await els.saveAiSettingsButton.fire('click');
+  await els.filesButton.fire('click'); await findBtn(els.filesList, 'An Chat anhängen').fire('click');
+  ok(!els.attachmentChip.hidden, 'Lokale KI: Anhängen ohne Freigabe möglich');
+  await els.attachmentRemove.fire('click');
+  ok(els.attachmentChip.hidden, 'Anhang lässt sich entfernen');
+  // Neue Datei vorschlagen und speichern
+  const writesBefore = store.ws.written.length;
+  replyQueue = ['Hier ist der Entwurf.\n<nexus-action>{"type":"save_file","name":"Einkauf.docx","content":"# Einkauf\\n\\n- Milch\\n- Brot"}</nexus-action>'];
+  await ask('Mach daraus ein Word-Dokument');
+  ok(fileCards().length === 1 && /Datei im Arbeitsordner/.test(fileCards()[0].children[0].textContent) && /Einkauf\.docx/.test(fileCards()[0].children[1].textContent), 'Datei-Vorschlag erscheint als Karte');
+  ok(fileCards()[0].children.some(c => c.className === 'action-preview' && /- Milch/.test(c.textContent)), 'Karte zeigt eine Vorschau des Inhalts');
+  ok(store.ws.written.length === writesBefore, 'Ohne Bestätigung wird nichts geschrieben');
+  await findBtn(fileCards()[0], 'Bestätigen').fire('click');
+  const written = store.ws.written.pop();
+  ok(written && written.name === 'Einkauf.docx' && written.data[0] === 0x50 && written.data[1] === 0x4B, 'Bestätigt: echte Word-Datei (ZIP) wird geschrieben');
+  const back = await run('NexusOffice').extractText('Einkauf.docx', written.data);
+  ok(back.text === '# Einkauf\n- Milch\n- Brot', 'Die geschriebene Datei enthält den Inhalt');
+  ok(fileCards().length === 0 && /Gespeichert im Arbeitsordner: „Einkauf\.docx“$/.test(chat().pop()), 'Bestätigung im Chat');
+  replyQueue = ['Neu.\n<nexus-action>{"type":"save_file","name":"notiz.txt","content":"überschreiben?"}</nexus-action>'];
+  await ask('Speichere das als notiz.txt');
+  await findBtn(fileCards()[0], 'Bestätigen').fire('click');
+  ok(store.ws.written.pop().name === 'notiz (2).txt' && /notiz \(2\)\.txt.*bleibt unverändert/.test(chat().pop()), 'Gleicher Name: neue Datei, das Original bleibt unverändert');
+  replyQueue = ['Text.\n<nexus-action>{"type":"save_file","name":"x.docx","content":"abgeschnitten'];
+  await ask('Schreib was Langes');
+  ok(fileCards().length === 0 && /unvollständig übertragen/.test(chat().pop()), 'Abgeschnittener Vorschlag: ehrlicher Hinweis statt Karte');
+  replyQueue = ['<nexus-search>x</nexus-search>', 'Ok.\n<nexus-action>{"type":"save_file","name":"web.txt","content":"aus dem Netz"}</nexus-action>'];
+  els.webSearchToggle.checked = true; await els.saveAiSettingsButton.fire('click');
+  await ask('Such und speichere');
+  ok(fileCards().length === 0, 'Nach einer Websuche entsteht nie ein Datei-Vorschlag');
+
+  console.log('18) Modell-Zentrale, Wetter, Rechner, Persönlichkeit, Sammelbestätigung, Diagnose, Updates (1.2)');
+  fileCards().forEach(c => c.remove());
+  run('fillExtrasForm({})');
+  ok(els.weatherToggle.checked === true && els.routerToggle.checked === false && els.routerBudget.value === '0' && els.personaAddress.value === 'sie', 'Voreinstellung: Wetter an, Modell-Zentrale aus, Budget 0 €, Anrede Sie');
+  await els.aiSettingsButton.fire('click'); els.weatherToggle.checked = true;
+  els.webSearchToggle.checked = false; els.shareMemoriesToggle.checked = true; els.shareFilesToggle.checked = true;
+  els.routerToggle.checked = true; els.mistralNoTrainingToggle.checked = false; els.personaAddress.value = 'du';
+  await els.saveAiSettingsButton.fire('click');
+  const routerCfg = log.filter(l => l.cmd === 'save_config').pop().args.config;
+  ok(routerCfg.router.enabled === true && routerCfg.router.providers.groq.enabled === true && routerCfg.router.providers.anthropic.enabled === false && routerCfg.router.budgetEur === 0, 'Modell-Zentrale wird gespeichert (Voreinstellung: Bezahlte aus, Budget 0 €)');
+  ok(els.routerProviders.children.length === 7 && /Mistral – 🟡/.test(els.routerProviders.children[1].children[0].children[1].textContent), 'Alle Anbieter mit Ampel sichtbar (Mistral gelb ohne Opt-out)');
+  ok(/Modell-Zentrale/.test(els.providerStatus.textContent) && /Groq/.test(els.aiModuleStatus.textContent), 'Seitenleiste zeigt die automatische Auswahl');
+  store.memories = [{ id: 'm1', text: 'Lieblingsfarbe Blau' }];
+  providerFail = { groq: 'Groq-Fehler (HTTP 429): rate limit' };
+  replyQueue = ['Hallo von Mistral.']; let bBefore = aiCalls().length;
+  await ask('Hallo, wie geht es?');
+  let rCalls = aiCalls().slice(bBefore);
+  ok(rCalls.length === 2 && rCalls[0].args.provider === 'groq' && rCalls[1].args.provider === 'mistral' && rCalls[0].args.fast === true, 'Limit bei Groq: automatischer Wechsel zu Mistral (schneller Abbruch)');
+  ok(rCalls[0].args.memories.length === 1 && rCalls[1].args.memories.length === 0, 'Private Daten nur an 🟢 (Groq ja, Mistral ohne Opt-out nein)');
+  ok(rCalls[0].args.persona.address === 'du' && /nächster Feiertag/.test(rCalls[0].args.now), 'Persönlichkeit und Feiertage gehen mit');
+  ok(/^nexus: Hallo von Mistral\.\n\n⚙ via Mistral · mistral-small-latest \(Ersatz: Groq – Limit erreicht\)$/.test(chat().pop()), 'Unter der Antwort steht, welche KI geantwortet hat und warum');
+  providerFail = {}; replyQueue = ['Ok.']; bBefore = aiCalls().length;
+  await ask('Und jetzt?');
+  ok(!aiCalls()[bBefore].args.messages.some(m => /⚙ via/.test(m.content)), 'Die via-Zeile geht nicht als Verlauf an die KI');
+  providerFail = { groq: 'Groq-Fehler (HTTP 400): zu lang' }; bBefore = aiCalls().length;
+  await ask('Noch eine Frage');
+  ok(aiCalls().length - bBefore === 1 && /HTTP 400/.test(chat().pop()), 'Inhaltlicher Fehler: kein Wechsel, ehrliche Meldung');
+  providerFail = { groq: 'Groq-Fehler (HTTP 503): down', mistral: 'Mistral ist nicht erreichbar: dns', google: 'Kein API-Schlüssel hinterlegt.', ollama: 'Lokale Ollama-KI ist nicht erreichbar.' };
+  bBefore = aiCalls().length; await ask('Hallo?');
+  ok(aiCalls().length - bBefore === 4 && /vorher versucht: Groq – Serverfehler, Mistral – nicht erreichbar, Google Gemini – kein Key/.test(chat().pop()), 'Alle ausgefallen: höchstens 4 Versuche, alle Gründe genannt');
+  providerFail = {}; replyQueue = ['Lokal hier.']; bBefore = aiCalls().length;
+  await ask('@lokal Wie spät ist es?');
+  ok(aiCalls()[bBefore].args.provider === 'ollama' && aiCalls()[bBefore].args.baseUrl === 'http://localhost:11434', '@lokal wählt die lokale KI von Hand');
+  replyQueue = ['Formel.']; bBefore = aiCalls().length;
+  await ask('Schreib mir eine Excel-Formel');
+  ok(aiCalls()[bBefore].args.provider === 'mistral' && aiCalls()[bBefore].args.model === 'codestral-latest', 'Code-Frage: Profil „Code & Formeln“ (Codestral)');
+  run("pendingAttachment = {name: 'notiz.txt', info: {label: 'Textdatei', text: 'geheim', note: '', truncated: false}}");
+  replyQueue = ['Gelesen.']; bBefore = aiCalls().length;
+  await ask('Fasse zusammen');
+  ok(aiCalls()[bBefore].args.provider === 'groq' && /<<<DATEI/.test(aiCalls()[bBefore].args.messages.slice(-1)[0].content), 'Mit Datei: nur Anbieter ohne Training (Groq statt Mistral)');
+  // Rechner
+  replyQueue = ['<nexus-calc>250 * 19%</nexus-calc>', 'Das sind 47,50 €.']; bBefore = aiCalls().length;
+  await ask('Wie viel sind 19 % von 250 €?');
+  rCalls = aiCalls().slice(bBefore);
+  ok(rCalls.length === 2 && rCalls[1].args.messages.slice(-1)[0].content === '[Ergebnis des Rechenwerkzeugs] 250 * 19% = 47,5', 'Rechenwerkzeug: Ergebnis geht an die KI zurück');
+  ok(/^nexus: Das sind 47,50 €\./.test(chat().pop()), 'Antwort ohne Werkzeug-Block');
+  // Wetter
+  replyQueue = ['Regen.']; bBefore = aiCalls().length;
+  await ask('Wie wird das Wetter in Hamburg morgen?');
+  ok(log.filter(l => l.cmd === 'weather_forecast').pop().args.place === 'Hamburg', 'Wetterfrage: Ort wird an Open-Meteo übergeben');
+  ok(/<<<WETTER\nOrt: Hamburg, Deutschland/.test(aiCalls()[bBefore].args.messages.slice(-1)[0].content), 'Wetterdaten stehen als markierte Daten in der Anfrage');
+  replyQueue = ['?']; bBefore = aiCalls().length; const weBefore = log.filter(l => l.cmd === 'weather_forecast').length;
+  await ask('Brauche ich einen Schirm?');
+  ok(log.filter(l => l.cmd === 'weather_forecast').length === weBefore && /Kein Ort bekannt/.test(aiCalls()[bBefore].args.messages.slice(-1)[0].content), 'Ohne Ort und Heimatort: ehrlicher Hinweis statt Raten');
+  els.weatherPlace.value = 'Hamburg'; await els.saveAiSettingsButton.fire('click');
+  replyQueue = ['Ja.']; await ask('Brauche ich einen Schirm?');
+  ok(log.filter(l => l.cmd === 'weather_forecast').length === weBefore + 1, 'Mit Heimatort wird das Wetter dort abgerufen');
+  // Sammelbestätigung
+  replyQueue = ['Zwei Aufgaben.\n<nexus-action>{"type":"create_task","title":"Milch kaufen"}</nexus-action><nexus-action>{"type":"create_task","title":"Brot kaufen"}</nexus-action>'];
+  await ask('Leg zwei Aufgaben an');
+  const bulkBar = els.chatBox.children.find(c => c.className === 'action-bulk');
+  ok(bulkBar && fileCards().length === 2, 'Mehrere Vorschläge: Leiste „Alle bestätigen“');
+  const tBefore = log.filter(l => l.cmd === 'save_task').length;
+  await findBtn(bulkBar, 'Alle bestätigen (2)').fire('click');
+  ok(log.filter(l => l.cmd === 'save_task').length === tBefore + 2 && fileCards().length === 0 && !els.chatBox.children.includes(bulkBar), 'Alle bestätigen speichert beide nacheinander');
+  // Diagnose und Updates
+  await els.diagnoseButton.fire('click');
+  ok(/✔ Groq · llama-3.3-70b-versatile/.test(els.diagnoseOutput.textContent) && /✔ Wetter: Hamburg/.test(els.diagnoseOutput.textContent) && /Arbeitsordner/.test(els.diagnoseOutput.textContent) && /Update verfügbar: 1\.3\.0/.test(els.diagnoseOutput.textContent), 'Diagnose prüft KIs, Wetter, Ordner und Updates');
+  await els.updateCheckButton.fire('click');
+  ok(!els.updateInstallButton.hidden && /Version 1\.3\.0 ist verfügbar/.test(els.updateStatus.textContent), 'Update gefunden: Installieren-Knopf erscheint');
+  await els.updateInstallButton.fire('click');
+  const updCmds = log.slice(-2).map(l => l.cmd);
+  ok(updCmds[0] === 'auto_backup' && updCmds[1] === 'update_install', 'Vor dem Update wird gesichert, dann installiert');
 
   console.log(`\nErgebnis: ${pass} bestanden, ${fail} fehlgeschlagen`);
   process.exit(fail ? 1 : 0);

@@ -35,11 +35,18 @@
     renderSpeakButton();
 
     // Nur der Chat-Verlauf, der dem Modell wirklich etwas nützt: keine Begrüßung, keine automatischen Hinweise.
-    function contextMessages() {
+    function contextMessages(allowFiles) {
+      const files = allowFiles === undefined ? filesAllowed(aiConfig) : allowFiles;
       const skip = [/^Guten Tag\. Ich bin Nexus\./, /^Erinnerung: /, /^Überfällige Erinnerung: /, /^Termin (in \d+ Min\.|beginnt jetzt): /, /^Heute ganztägig: /, /^Guten Morgen\. Hier ist dein Überblick/, /^Es tut mir leid\. Die KI-Anfrage/, /^Sehr wohl\. Bitte richten Sie/, /^Die KI-Anbindung ist nur/];
       return currentMessages
         .filter(m => (m.sender === 'user' || m.sender === 'nexus') && m.text && !(m.sender === 'nexus' && skip.some(rx => rx.test(m.text))))
-        .map(m => ({role: m.sender === 'user' ? 'user' : 'assistant', content: m.text}));
+        .map(m => ({role: m.sender === 'user' ? 'user' : 'assistant', content: m.sender === 'nexus' ? NexusRouter.stripVia(m.text) : fileContent(m, files)}));
+    }
+    // Angehängter Dateitext bleibt nur im laufenden Gespräch (nicht im gespeicherten Verlauf) und geht an
+    // Cloud-KI nur, solange die Freigabe besteht.
+    function fileContent(m, allowFiles) {
+      if (!m.fileContext) return m.text;
+      return m.text + '\n\n' + (allowFiles ? m.fileContext : '[Angehängte Datei nicht mitgeschickt: keine Freigabe für Cloud-KI.]');
     }
     function taskForContext(task) {
       let line = task.title || '';
@@ -67,18 +74,30 @@
       const box = document.getElementById('chatBox');
       const card = document.createElement('div'); card.className = 'action-card';
       const title = document.createElement('div'); title.className = 'action-title';
-      title.textContent = action.type === 'remember' ? 'Vorschlag: im Gedächtnis speichern' : (action.type === 'create_event' ? 'Vorschlag: Termin in den Kalender eintragen' : 'Vorschlag: Aufgabe anlegen');
+      title.textContent = {remember: 'Vorschlag: im Gedächtnis speichern', create_event: 'Vorschlag: Termin in den Kalender eintragen', save_file: 'Vorschlag: Datei im Arbeitsordner speichern'}[action.type] || 'Vorschlag: Aufgabe anlegen';
       const body = document.createElement('div'); body.className = 'action-body'; body.textContent = NexusActions.describe(action);
       card.append(title, body);
+      if (action.type === 'save_file') { const pre = document.createElement('pre'); pre.className = 'action-preview'; pre.textContent = NexusActions.filePreview(action); card.appendChild(pre); }
       action.warnings.forEach(w => { const el = document.createElement('div'); el.className = 'action-warning'; el.textContent = w; card.appendChild(el); });
       const row = document.createElement('div'); row.className = 'action-buttons';
       const confirmButton = document.createElement('button'); confirmButton.className = 'btn'; confirmButton.type = 'button'; confirmButton.textContent = 'Bestätigen';
       const discardButton = document.createElement('button'); discardButton.className = 'btn secondary'; discardButton.type = 'button'; discardButton.textContent = 'Verwerfen';
       row.append(confirmButton, discardButton); card.appendChild(row); box.appendChild(card); box.scrollTop = box.scrollHeight;
-      discardButton.addEventListener('click', () => card.remove());
-      confirmButton.addEventListener('click', async () => {
+      const discard = () => { if (discardButton.disabled) return; confirmButton.disabled = true; discardButton.disabled = true; card.remove(); };
+      discardButton.addEventListener('click', discard);
+      card.nexusDiscard = discard;
+      card.nexusConfirm = async () => {
+        if (confirmButton.disabled) return;
         confirmButton.disabled = true; discardButton.disabled = true;
         try {
+          if (action.type === 'save_file') {
+            const bytes = await NexusOffice.build(action);
+            const saved = await desktopInvoke('workspace_write', {name: action.name, data: Array.from(bytes)});
+            card.remove();
+            addMessage('\u2714 Gespeichert im Arbeitsordner: \u201E' + saved + '\u201C' + (saved !== action.name ? ' (eine Datei \u201E' + action.name + '\u201C gab es schon; sie bleibt unver\u00e4ndert)' : ''), 'nexus'); await persistConversation();
+            if (filesModal.classList.contains('open')) refreshFiles();
+            return;
+          }
           const call = NexusActions.toInvoke(action);
           const result = await desktopInvoke(call.cmd, call.args);
           if (call.cmd === 'save_task') { taskItems = result; renderTasks(); }
@@ -90,7 +109,23 @@
           confirmButton.disabled = false; discardButton.disabled = false;
           const el = document.createElement('div'); el.className = 'action-warning'; el.textContent = 'Speichern fehlgeschlagen: ' + String(error); card.appendChild(el);
         }
+      };
+      confirmButton.addEventListener('click', card.nexusConfirm);
+      return card;
+    }
+    // Mehrere Vorschlaege auf einmal: "Alle bestaetigen" arbeitet die Karten nacheinander ab (jede wird einzeln geprueft).
+    function renderBulkBar(cards) {
+      const box = document.getElementById('chatBox');
+      const bar = document.createElement('div'); bar.className = 'action-bulk';
+      const all = document.createElement('button'); all.className = 'btn'; all.type = 'button'; all.textContent = 'Alle bestätigen (' + cards.length + ')';
+      const none = document.createElement('button'); none.className = 'btn secondary'; none.type = 'button'; none.textContent = 'Alle verwerfen';
+      bar.append(all, none); box.appendChild(bar); box.scrollTop = box.scrollHeight;
+      all.addEventListener('click', async () => {
+        all.disabled = true; none.disabled = true;
+        for (const card of cards) await card.nexusConfirm(); // bereits verworfene oder gespeicherte Karten sind gesperrt
+        bar.remove();
       });
+      none.addEventListener('click', () => { cards.forEach(c => c.nexusDiscard()); bar.remove(); });
     }
 
     // Internetzugriff nur mit Freigabe; bei Cloud-KI zusaetzlich mit eigener Freigabe.
@@ -113,48 +148,85 @@
     }
 
     async function sendMessage() {
-      const input = document.getElementById('userInput'), value = input.value.trim();
+      const input = document.getElementById('userInput');
+      const attachment = pendingAttachment;
+      const value = input.value.trim() || (attachment ? 'Bitte sieh dir die angehängte Datei an.' : '');
       if (!value || busy) return;
+      if (attachment && !filesAllowed(aiConfig)) { statusText.textContent = 'Datei nicht gesendet: Für Cloud-KI zuerst in der KI-Verwaltung erlauben.'; return; }
       busy = true;
       const sendButton = document.getElementById('sendButton');
       sendButton.disabled = true;
-      addMessage(value, 'user'); await persistConversation(); input.value = '';
+      addMessage(attachment ? value + '\n\uD83D\uDCCE ' + attachment.name : value, 'user');
+      if (attachment) { currentMessages[currentMessages.length - 1].fileContext = NexusOffice.wrapForModel(attachment.name, attachment.info); clearAttachment(); }
+      await persistConversation(); input.value = '';
       orbState = 'processing'; statusText.textContent = 'NEXUS denkt nach ...';
       try {
-        let reply, webRounds = 0;
-        const webSources = [];
-        if (!aiConfig.provider) {
+        let reply, webRounds = 0, used = null;
+        const webSources = [], failures = [];
+        if (!aiConfig.provider && !routerOn(aiConfig)) {
           reply = 'Sehr wohl. Bitte richten Sie zunächst unter „KI-Verwaltung“ einen KI-Anbieter ein.';
         } else if (!desktopMode) {
           reply = 'Die KI-Anbindung ist nur in der installierten Windows-Desktop-App verfügbar. In der Browser-Vorschau kann ich nicht antworten.';
         } else {
-          // Lokale KI (Daten bleiben auf dem PC) erhält Erinnerungen und Aufgaben immer;
-          // Cloud-Anbieter nur nach ausdrücklicher Freigabe in der KI-Verwaltung.
-          const local = isLocalProvider(aiConfig);
-          const memories = (local || aiConfig.shareMemoriesWithCloud) ? (await desktopInvoke('list_memories')).map(m => m.text) : [];
-          const tasks = (local || aiConfig.shareTasksWithCloud) ? (await desktopInvoke('list_tasks')).filter(t => !t.done).map(taskForContext) : [];
-          const events = (local || aiConfig.shareCalendarWithCloud) ? await upcomingEventLines().catch(() => []) : [];
-          const webOn = webAllowed(aiConfig);
-          const base = {
-            provider: aiConfig.provider,
-            model: effectiveModel(aiConfig),
-            baseUrl: baseUrlFor(aiConfig),
-            memories, tasks, events, webEnabled: webOn,
-            now: new Date().toLocaleString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'})
+          const candidates = planCandidates(value, !!attachment);
+          // Private Daten nur einmal lesen; pro KI wird dann entschieden, was sie bekommen darf.
+          const anyLocal = candidates.some(c => c.local);
+          const allMemories = (anyLocal || aiConfig.shareMemoriesWithCloud) ? (await desktopInvoke('list_memories')).map(m => m.text) : [];
+          const allTasks = (anyLocal || aiConfig.shareTasksWithCloud) ? (await desktopInvoke('list_tasks')).filter(t => !t.done).map(taskForContext) : [];
+          const allEvents = (anyLocal || aiConfig.shareCalendarWithCloud) ? await upcomingEventLines().catch(() => []) : [];
+          const weatherBlock = await weatherBlockFor(value);
+          const extra = [];
+          const may = (c, flag) => c.local || (c.privateOk && aiConfig[flag] === true);
+          const webFor = c => aiConfig.webSearch === true && (c.local || aiConfig.webWithCloud === true);
+          const messagesFor = c => {
+            const list = contextMessages(c.local || (c.privateOk && aiConfig.shareFilesWithCloud === true));
+            if (weatherBlock && list.length) list[list.length - 1] = {...list[list.length - 1], content: list[list.length - 1].content + '\n\n' + weatherBlock};
+            return [...list, ...extra];
           };
-          let messages = contextMessages();
-          reply = await desktopInvoke('ai_chat', {...base, messages});
-          // Internetanfragen des Modells: hoechstens 2 pro Frage. Der Webtext bleibt nur in dieser einen Anfrage und
-          // wird nicht im Gespraechsverlauf gespeichert.
-          while (webOn && webRounds < NexusWeb.MAX_ROUNDS) {
-            const request = NexusWeb.parseRequest(reply);
+          const now = nowLine();
+          let index = 0;
+          // Fragt die KIs der Reihe nach; gewechselt wird nur bei Limit, Ausfall, fehlendem Key oder Zeitüberschreitung.
+          const ask = async () => {
+            for (;;) {
+              const c = candidates[index];
+              if (c.routed) statusText.textContent = 'NEXUS denkt nach … (' + c.label + ')';
+              try {
+                const answer = await desktopInvoke('ai_chat', {
+                  provider: c.id, model: c.model, baseUrl: c.baseUrl,
+                  memories: may(c, 'shareMemoriesWithCloud') ? allMemories : [], tasks: may(c, 'shareTasksWithCloud') ? allTasks : [],
+                  events: may(c, 'shareCalendarWithCloud') ? allEvents : [], webEnabled: webFor(c), now, persona: aiConfig.persona || {},
+                  fast: !!c.routed && index < candidates.length - 1, messages: messagesFor(c)
+                });
+                used = c; return answer;
+              } catch (error) {
+                if (!c.routed || index >= candidates.length - 1 || !NexusRouter.retryable(error)) {
+                  throw failures.length ? new Error(String(error) + ' (vorher versucht: ' + failures.map(f => f.label + ' – ' + f.reason).join(', ') + ')') : error;
+                }
+                failures.push({label: c.label, reason: NexusRouter.reason(error)});
+                index++;
+              }
+            }
+          };
+          reply = await ask();
+          // Werkzeuge: Rechnen (höchstens 3) und Internet (höchstens 2). Ergebnisse bleiben nur in dieser Anfrage.
+          let calcRounds = 0;
+          for (let round = 0; round < 5; round++) {
+            const calc = NexusTools.parseCalc(reply);
+            if (calc !== null && calcRounds < 3) {
+              calcRounds++;
+              extra.push({role: 'assistant', content: '<nexus-calc>' + calc + '</nexus-calc>'}, {role: 'user', content: NexusTools.calcResultText(calc)});
+              reply = await ask(); continue;
+            }
+            const request = webFor(used) && webRounds < NexusWeb.MAX_ROUNDS ? NexusWeb.parseRequest(reply) : null;
             if (!request) break;
             webRounds++;
             const outcome = await runWebRequest(request);
             webSources.push(...outcome.urls);
-            messages = [...messages, {role: 'assistant', content: NexusWeb.requestText(request)}, {role: 'user', content: NexusWeb.wrapResults(outcome.body, webRounds >= NexusWeb.MAX_ROUNDS)}];
-            reply = await desktopInvoke('ai_chat', {...base, messages});
+            extra.push({role: 'assistant', content: NexusWeb.requestText(request)}, {role: 'user', content: NexusWeb.wrapResults(outcome.body, webRounds >= NexusWeb.MAX_ROUNDS)});
+            reply = await ask();
           }
+          reply = NexusTools.stripCalc(reply);
+          if (used && used.routed) await recordSpend(used, messagesFor(used), reply);
         }
         // Waren Internetinhalte im Spiel, entstehen daraus nie Aktionen (Schutz vor eingeschleusten Anweisungen).
         const parsed = NexusActions.extract(NexusWeb.strip(reply));
@@ -162,13 +234,16 @@
         const actions = fromWeb ? [] : parsed.actions;
         let shown = parsed.text || (actions.length ? 'Ich habe einen Vorschlag vorbereitet. Bitte bestätigen Sie ihn unten.' : 'Dazu konnte ich leider keine Antwort formulieren.');
         if (fromWeb && parsed.actions.length) shown += '\n\nHinweis: Aus Internetinhalten lege ich nichts automatisch an. Bitte wiederhole diese Bitte ohne Recherche.';
+        if (parsed.incomplete) shown += '\n\nHinweis: Mein Vorschlag wurde unvollständig übertragen (die Antwort war vermutlich zu lang) und wird deshalb nicht angezeigt. Bitte in kleineren Teilen versuchen.';
         const sourceLine = fromWeb ? NexusWeb.sourcesLine(webSources) : '';
-        addMessage(sourceLine ? shown + '\n\n' + sourceLine : shown, 'nexus'); await persistConversation();
-        actions.forEach(renderActionCard);
+        const viaLine = used && used.routed ? NexusRouter.viaLine(used, failures) : '';
+        addMessage([shown, sourceLine, viaLine].filter(Boolean).join('\n\n'), 'nexus'); await persistConversation();
+        const cards = actions.map(renderActionCard);
+        if (cards.length >= 2) renderBulkBar(cards);
         if (speakEnabled) { orbState = 'speaking'; statusText.textContent = 'NEXUS spricht ...'; speakText(shown); }
         else idleState();
       } catch (error) {
-        const message = 'Es tut mir leid. Die KI-Anfrage ist fehlgeschlagen: ' + String(error);
+        const message = 'Es tut mir leid. Die KI-Anfrage ist fehlgeschlagen: ' + (error && error.message ? error.message : String(error));
         orbState = 'idle'; statusText.textContent = 'KI-Verbindung prüfen';
         addMessage(message, 'nexus'); await persistConversation();
       } finally {

@@ -1,5 +1,35 @@
 # Änderungen
 
+## 1.2.0 – Modell-Zentrale, Wetter, Updates
+**Neu**
+- **Modell-Zentrale:** automatische KI-Auswahl je Aufgabe (Allgemein, Dokumente, Code & Formeln, Recherche) mit änderbaren Ranglisten; automatischer Wechsel bei Limit, Serverfehler, Zeitüberschreitung oder fehlendem Key (höchstens 4 Versuche, schneller Abbruch statt langer Wiederholungen); `@anbieter` wählt von Hand.
+- **Datenschutz-Ampel:** private Daten und Dateien nur an Anbieter ohne Training (🟢); Mistral nach eigenem Opt-out, Gemini nur mit Abrechnungskonto.
+- **Budget:** Standard 0 € (Claude/OpenAI gesperrt); mit Budget grobe Kostenschätzung pro Monat. OpenRouter nur mit Gratismodellen.
+- **Anzeige** „⚙ via Anbieter · Modell (Ersatz: …)“ unter jeder Antwort; Seitenleiste zeigt das bevorzugte Modell.
+- **Wetter** über Open-Meteo (ohne Key, nur der Ort wird gesendet), Heimatort, Quelle wird genannt.
+- **Feiertage** je Bundesland (lokal berechnet), **Rechenwerkzeug** für exakte Rechnungen, **Persönlichkeit** (Sie/du, Länge, Butler-Ton).
+- **Morgenüberblick** mit Wetter, Feiertag und Geburtstagen der Woche. **„Alle bestätigen“** bei mehreren Vorschlägen.
+- **Diagnose-Knopf:** prüft alle KIs, Wetter, Arbeitsordner, Datenstatus und Updates.
+- **Signierte Auto-Updates** (tauri-plugin-updater): Prüfung beim Start und per Knopf, Installation nur auf Klick, vorher automatische Sicherung. GitHub-Workflow veröffentlicht signierte Releases im öffentlichen Repository; Anleitung in `UPDATES.md`, Schlüssel per `UPDATE-SCHLUESSEL-ERZEUGEN.bat`.
+- Neue Abhängigkeit: `tauri-plugin-updater`. 4 neue Rust-Tests, 12 Unit- und 25 Oberflächentests.
+
+**Geändert**
+- Datum im System-Prompt darf länger sein (Feiertage). Ohne Modell-Zentrale verhält sich NEXUS wie 1.1.
+
+## 1.1.0 – Arbeitsordner
+**Neu**
+- **Arbeitsordner** `Dokumente\Nexus-Arbeitsordner`: Dateien ansehen, im Explorer öffnen und mit 📎 an den Chat anhängen.
+- **Lesen:** Word (`.docx`) mit Überschriften, Aufzählungen und Tabellen; Excel (`.xlsx`) mit allen Tabellenblättern, Datumswerten und berechneten Formeln; `.txt`, `.md`, `.csv`, `.json` (UTF-8, UTF-16 und ältere ANSI-Dateien). Bis 30.000 Zeichen pro Datei, Kürzung wird gemeldet.
+- **Speichern:** neue Aktion `save_file` mit Vorschau-Karte und Bestätigung. Erzeugt echte Word-Dateien (Überschriften, Fettdruck, Aufzählungen, Tabellen) und Excel-Dateien (mehrere Blätter, Zahlen, Formeln; deutsche Funktionsnamen und Semikolons werden übersetzt). CSV mit BOM für Umlaute in Excel.
+- **Schutz im Code:** nur Dateien direkt im Ordner, nur erlaubte Endungen, keine Pfade, Verknüpfungen, reservierten Windows-Namen; Größenlimits; **nie überschreiben** (bei gleichem Namen `Name (2).ext`, abgesichert mit `create_new`); kein Löschen. Dateiinhalte gehen als fremde Daten an die KI; Cloud-KI nur mit eigener Freigabe; nach einer Websuche keine Datei-Vorschläge.
+- Abgeschnittene Antworten mit unvollständigem Vorschlag werden erkannt und ehrlich gemeldet.
+- Ohne neue Abhängigkeiten (ZIP über die eingebauten Compression-Streams).
+- 6 neue Rust-Tests, 15 Unit- und 22 Oberflächentests.
+
+**Geändert**
+- Längere Nachrichten erlaubt (40.000 Zeichen pro Nachricht, 100.000 im Verlauf), damit angehängte Dateien Platz haben.
+- Anthropic: Antwortlimit von 4096 auf 8192 Tokens erhöht (für längere Dokumente).
+
 ## 1.0.0 – Nexus Assistent
 Erste fertige Version. Sie fasst alle Entwicklungsstufen (0.7 bis 0.14) zusammen.
 

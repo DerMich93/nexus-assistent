@@ -29,6 +29,19 @@
         try { todaysEvents = NexusCalendar.onDay(await desktopInvoke('list_events'), now); } catch (_) { /* Kalender nicht lesbar */ }
         summary.push(`Termine heute: ${todaysEvents.length}.`);
         if (todaysEvents.length) summary.push('Termine: ' + todaysEvents.map(o => NexusCalendar.shortLine(o)).join('; ') + '.');
+        // 1.2: Feiertag, Geburtstage der nächsten 7 Tage (aus dem Kalender) und Wetter für den Heimatort.
+        const holiday = NexusTools.holidayOn(now, aiConfig.holidayState || '');
+        if (holiday) summary.push('Heute ist Feiertag: ' + holiday.name + '.');
+        try {
+          const all = await desktopInvoke('list_events'), birthdays = [];
+          for (let i = 0; i < 7; i++) {
+            const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+            NexusCalendar.onDay(all, day).filter(o => /geburtstag/i.test(o.event.title)).forEach(o => birthdays.push((i === 0 ? 'heute' : weekdayNames[day.getDay()]) + ': ' + o.event.title));
+          }
+          if (birthdays.length) summary.push('Geburtstage diese Woche: ' + birthdays.join('; ') + '.');
+        } catch (_) { /* Kalender nicht lesbar */ }
+        const place = ((aiConfig.weather || {}).place || '').trim();
+        if (place && weatherEnabled()) { try { summary.push(NexusTools.weatherSummary(await desktopInvoke('weather_forecast', {place})) + '.'); } catch (_) { summary.push('Wetter: derzeit nicht abrufbar.'); } }
         addMessage(summary.join(' '),'nexus');
         notifyNative('NEXUS Morgenüberblick', summary.slice(1).join(' '));
         statusText.textContent='Dein Morgenüberblick ist bereit.';

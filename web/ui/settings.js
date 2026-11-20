@@ -33,7 +33,7 @@
     let vaultState = {enabled: false, keyPresent: false, locked: false}, vaultKeyTimer = null;
     const desktopMode = !!(window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
     const desktopInvoke = desktopMode ? window.__TAURI__.core.invoke : null;
-    let aiConfig = {provider:'', model:'', customModel:'', ollamaUrl:'http://localhost:11434', customUrl:'', shareMemoriesWithCloud:false, shareTasksWithCloud:false, sttMode:'off', sttUrl:'http://127.0.0.1:8178', sttModel:'', closeToTray:false, nativeNotifications:true, autoBackup:true, webSearch:false, webWithCloud:false, shareCalendarWithCloud:false, eventLeadMinutes:15};
+    let aiConfig = {provider:'', model:'', customModel:'', ollamaUrl:'http://localhost:11434', customUrl:'', shareMemoriesWithCloud:false, shareTasksWithCloud:false, sttMode:'off', sttUrl:'http://127.0.0.1:8178', sttModel:'', closeToTray:false, nativeNotifications:true, autoBackup:true, webSearch:false, webWithCloud:false, shareCalendarWithCloud:false, eventLeadMinutes:15, shareFilesWithCloud:false};
     if (!desktopMode) { try { aiConfig = {...aiConfig, ...JSON.parse(localStorage.getItem('nexus.aiConfig') || '{}')}; } catch (_) {} }
 
     // Modell, das tatsächlich verwendet wird: der freie Modellname hat Vorrang vor der Auswahlliste.
@@ -70,6 +70,8 @@
         webSearch: webSearchToggle.checked,
         webWithCloud: webCloudToggle.checked,
         shareCalendarWithCloud: shareCalendarToggle.checked,
+        shareFilesWithCloud: document.getElementById('shareFilesToggle').checked,
+        ...readExtrasForm(),
         eventLeadMinutes: Number(eventLeadSelect.value) || 0
       };
     }
@@ -193,6 +195,8 @@
       webSearchToggle.checked = aiConfig.webSearch === true;
       webCloudToggle.checked = aiConfig.webWithCloud === true;
       shareCalendarToggle.checked = aiConfig.shareCalendarWithCloud === true;
+      document.getElementById('shareFilesToggle').checked = aiConfig.shareFilesWithCloud === true;
+      fillExtrasForm(aiConfig);
       eventLeadSelect.value = String(aiConfig.eventLeadMinutes != null ? aiConfig.eventLeadMinutes : 15);
       autostartToggle.checked = false; autostartInitial = false;
       if (desktopMode) {
@@ -212,9 +216,10 @@
       setupModal.classList.add('open');
     }
     function updateProviderStatus() {
-      const configured = !!aiConfig.provider;
-      document.getElementById('providerStatus').textContent = configured ? providerNames[aiConfig.provider] : 'Nicht eingerichtet';
-      document.getElementById('aiModuleStatus').textContent = configured ? (effectiveModel(aiConfig) || 'Modell fehlt') : 'Nicht eingerichtet';
+      const configured = !!aiConfig.provider, routed = routerOn(aiConfig);
+      const first = routed ? NexusRouter.plan(aiConfig, {profile: 'general'}).candidates[0] : null;
+      document.getElementById('providerStatus').textContent = routed ? 'Modell-Zentrale (automatisch)' : (configured ? providerNames[aiConfig.provider] : 'Nicht eingerichtet');
+      document.getElementById('aiModuleStatus').textContent = routed ? (first ? 'bevorzugt: ' + first.label + ' · ' + first.model : 'keine KI aktiv') : (configured ? (effectiveModel(aiConfig) || 'Modell fehlt') : 'Nicht eingerichtet');
       const webAsked = aiConfig.webSearch === true, webOk = webAsked && (isLocalProvider(aiConfig) || aiConfig.webWithCloud === true);
       document.getElementById('webStatus').textContent = webOk ? 'An' : (webAsked ? 'Aus (Cloud-KI nicht freigegeben)' : 'Aus');
       document.getElementById('speechStatus').textContent = {off: 'Aus', local: 'Lokal', groq: 'Groq (Cloud)', openai: 'OpenAI (Cloud)', custom: 'Eigener Server'}[aiConfig.sttMode || 'off'] || 'Aus';
