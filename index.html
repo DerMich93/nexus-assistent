@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#050914">
+  <meta name="description" content="Nexus – dein persönlicher KI-Assistent.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/nexus-icon-192.png">
+  <link rel="apple-touch-icon" href="assets/nexus-icon-192.png">
+  <title>Nexus Assistent 1.0</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main class="app-container" id="app">
+    <div class="top-actions"><button class="btn secondary" id="automationButton" type="button">Automatisierungen</button><button class="btn secondary" id="tasksButton" type="button">Aufgaben</button><button class="btn secondary" id="calendarButton" type="button">Kalender</button><button class="btn secondary" id="newChatButton" type="button">Neues Gespräch</button><button class="btn secondary" id="historyButton" type="button">Gesprächsverlauf</button><button class="btn secondary" id="memoryButton" type="button">Gedächtnis</button><button class="btn secondary" id="aiSettingsButton" type="button">⚙ KI-Verwaltung</button><button class="btn secondary" id="backupButton" type="button">Datensicherung</button></div>
+    <aside class="sidebar left">
+      <h1>Nexus</h1><div class="subtitle">PERSONAL AI ASSISTANT</div>
+      <div class="brand-line"></div>
+      <div class="status-badge"><span class="status-dot"></span><span id="statusText">System bereit</span></div>
+      <div class="section-label">Persönlichkeit</div>
+      <div class="panel-box"><strong>Britischer Butler</strong><br>Sarkastisch &amp; hochpräzise</div>
+      <div class="section-label">Systemstatus</div>
+      <div class="stat-row"><span>KI-Anbieter</span><span id="providerStatus">Nicht eingerichtet</span></div>
+      <div class="stat-row"><span>KI-Modul</span><span id="aiModuleStatus">Nicht eingerichtet</span></div>
+      <div class="stat-row"><span>Internet</span><span id="webStatus">Aus</span></div>
+      <div class="stat-row"><span>Spracheingabe</span><span id="speechStatus">Aus</span></div>
+      <div class="stat-row"><span>Daten</span><span id="dataStatus">Unverschlüsselt</span></div>
+      <div class="section-label" style="margin-top:18px">Visualisierung</div>
+      <div class="panel-box">Otter-Hologramm aktiv<br><strong>Plasma-Kern synchronisiert</strong></div>
+      <div class="quote">„Exzellenz ist keine Option, sondern Standard.“</div>
+    </aside>
+
+    <section class="center-stage" aria-label="Nexus Visualisierung">
+      <div class="circle-frame" id="circleFrame"></div>
+      <canvas id="orbCanvas" aria-hidden="true"></canvas>
+    </section>
+
+    <aside class="sidebar right">
+      <h3>Chat-Protokoll</h3>
+      <div class="chat-box" id="chatBox">
+        <div class="message nexus">Guten Tag. Ich bin Nexus. Wie darf ich Ihnen behilflich sein?</div>
+      </div>
+    </aside>
+
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="Ihre Nachricht an Nexus ..." autocomplete="off" aria-label="Nachricht">
+      <button class="btn" id="sendButton" type="button">Senden</button>
+      <button class="btn voice" id="voiceButton" type="button" aria-pressed="false">Voice: AUS</button>
+      <button class="btn voice" id="speakButton" type="button" aria-pressed="false">Vorlesen: AUS</button>
+      <button class="btn" id="installButton" type="button" hidden>App installieren</button>
+    </div>
+  </main>
+
+  <div class="modal-backdrop" id="aiSetupModal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <section class="setup-card">
+      <h2 id="setupTitle">NEXUS – Private Edition · KI einrichten</h2>
+      <p class="setup-intro" id="setupIntro">Willkommen. Bevor ich meine Arbeit aufnehme, wählen wir gemeinsam das passende KI-System aus.</p>
+      <label class="field-label" for="providerSelect">KI-Anbieter</label>
+      <select id="providerSelect">
+        <optgroup label="Cloud (eigener API-Key)">
+          <option value="openai">OpenAI – GPT</option>
+          <option value="anthropic">Anthropic – Claude</option>
+          <option value="google">Google – Gemini</option>
+          <option value="groq">Groq – schnelle Cloud-KI</option>
+          <option value="mistral">Mistral</option>
+          <option value="openrouter">OpenRouter – viele Modelle, ein Key</option>
+        </optgroup>
+        <optgroup label="Lokal auf diesem PC">
+          <option value="ollama">Lokale KI – Ollama</option>
+          <option value="custom">Eigener Server (OpenAI-kompatibel, z. B. LM Studio)</option>
+        </optgroup>
+      </select>
+      <label class="field-label" for="modelSelect">Modell</label>
+      <select id="modelSelect"></select>
+      <label class="field-label" for="customModel">Eigener Modellname (optional, überschreibt die Auswahl)</label>
+      <input id="customModel" type="text" autocomplete="off" spellcheck="false" placeholder="z. B. ein neues Modell, das noch nicht in der Liste steht">
+      <div id="apiKeyWrap">
+        <label class="field-label" for="apiKeyInput">API-Key</label>
+        <input id="apiKeyInput" type="password" autocomplete="off" placeholder="API-Key hier einfügen">
+      </div>
+      <div id="customWrap" hidden>
+        <label class="field-label" for="customUrl">Server-Adresse</label>
+        <input id="customUrl" type="url" autocomplete="off" spellcheck="false" placeholder="http://localhost:1234">
+        <div style="font-size:.78rem;opacity:.75;margin-top:6px">Erlaubt: https-Adressen oder http nur für localhost. Ohne Pfadangabe wird /v1 ergänzt.</div>
+      </div>
+      <div id="ollamaWrap" hidden>
+        <label class="field-label" for="ollamaUrl">Ollama-Adresse</label>
+        <input id="ollamaUrl" type="url" value="http://localhost:11434" placeholder="http://localhost:11434">
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <label class="field-label" for="sttModeSelect">Spracheingabe (Mikrofon)</label>
+        <select id="sttModeSelect">
+          <option value="off">Aus</option>
+          <option value="local">Lokal – Whisper-Server auf diesem PC (offline)</option>
+          <option value="groq">Groq Whisper (Cloud, schnell)</option>
+          <option value="openai">OpenAI Whisper (Cloud)</option>
+          <option value="custom">Eigener OpenAI-kompatibler Server</option>
+        </select>
+        <div id="sttUrlWrap" hidden><label class="field-label" for="sttUrl">Server-Adresse</label><input id="sttUrl" type="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:8178"></div>
+        <div id="sttModelWrap" hidden><label class="field-label" for="sttModel">Modellname</label><input id="sttModel" type="text" autocomplete="off" spellcheck="false" placeholder="z. B. whisper-large-v3-turbo"></div>
+        <div id="sttKeyWrap" hidden><label class="field-label" for="sttKey">API-Key für die Spracheingabe</label><input id="sttKey" type="password" autocomplete="off" spellcheck="false" placeholder="wird im Windows-Schlüsselbund gespeichert"></div>
+        <div id="sttHint" style="font-size:.78rem;opacity:.75;margin-top:6px"></div>
+        <button class="btn secondary" id="testSttButton" type="button" style="margin-top:8px" hidden>Spracheingabe testen</button>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Hintergrund &amp; Benachrichtigungen</div>
+        <label class="privacy-toggle"><input type="checkbox" id="autostartToggle"><span>NEXUS mit Windows starten (leise im Infobereich neben der Uhr).</span></label>
+        <label class="privacy-toggle"><input type="checkbox" id="closeToTrayToggle"><span>Beim Schließen des Fensters im Infobereich weiterlaufen, damit Erinnerungen auch dann kommen. Beenden: Rechtsklick auf das NEXUS-Symbol → „NEXUS beenden“.</span></label>
+        <label class="privacy-toggle"><input type="checkbox" id="notificationsToggle"><span>Erinnerungen und Morgenüberblick als Windows-Benachrichtigung zeigen, wenn NEXUS nicht im Vordergrund ist.</span></label>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Internetzugriff</div>
+        <label class="privacy-toggle"><input type="checkbox" id="webSearchToggle"><span>NEXUS darf im Internet suchen (DuckDuckGo) und Seiten aus den Suchergebnissen lesen. Standardmäßig aus.</span></label>
+        <label class="privacy-toggle"><input type="checkbox" id="webCloudToggle"><span>Auch bei Cloud-KI erlauben. Dann gehen die Suchanfrage und die gefundenen Texte zusätzlich an deinen KI-Anbieter.</span></label>
+        <div style="font-size:.78rem;opacity:.75;margin-top:6px">Schutz: nur https, nie interne Adressen, nur Seiten aus den Suchergebnissen, Größen- und Zeitlimits. Aus Internetinhalten legt NEXUS nie Aufgaben oder Gedächtnis-Einträge an. Die Suche nutzt eine inoffizielle Schnittstelle von DuckDuckGo und kann ausfallen oder blockiert werden; NEXUS sagt das dann ehrlich.</div>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Datenverschlüsselung</div>
+        <div id="vaultStatus" style="font-size:.85rem;margin:6px 0"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn secondary" id="vaultToggleButton" type="button">Verschlüsselung einschalten</button>
+          <button class="btn secondary" id="vaultShowKeyButton" type="button" hidden>Wiederherstellungsschlüssel anzeigen</button>
+        </div>
+        <input id="vaultKeyOutput" type="text" readonly hidden style="margin-top:8px">
+        <div id="vaultImportWrap" hidden>
+          <label class="field-label" for="vaultKeyInput">Wiederherstellungsschlüssel eingeben</label>
+          <input id="vaultKeyInput" type="text" autocomplete="off" spellcheck="false" placeholder="xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx">
+          <button class="btn secondary" id="vaultImportButton" type="button" style="margin-top:8px">Schlüssel übernehmen</button>
+        </div>
+        <div id="vaultHint" style="font-size:.78rem;opacity:.75;margin-top:6px">Schützt vor dem Kopieren der Dateien (z. B. aus einer Cloud-Sicherung oder von einer ausgebauten Festplatte). Nicht geschützt: Zugriff durch jemanden, der an deinem angemeldeten Windows-Konto sitzt.</div>
+      </div>
+      <div style="margin-top:16px;border-top:1px solid rgba(255,255,255,.12);padding-top:12px">
+        <div class="field-label">Automatische Sicherung</div>
+        <label class="privacy-toggle"><input type="checkbox" id="autoBackupToggle"><span>Daten automatisch sichern (beim Start und danach stündlich geprüft, nur bei Änderungen). Es bleiben nur die letzten 5 Sicherungen erhalten, ältere werden gelöscht. Ablage: %LOCALAPPDATA%\de.nexus.assistant\AutoBackups</span></label>
+        <select id="autoBackupSelect"></select>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn secondary" id="autoBackupNowButton" type="button">Jetzt sichern</button>
+          <button class="btn secondary" id="autoBackupRestoreButton" type="button">Ausgewählte Sicherung wiederherstellen</button>
+        </div>
+      </div>
+      <label class="privacy-toggle"><input type="checkbox" id="shareMemoriesToggle"><span>Ich erlaube NEXUS, meine Erinnerungen („Gedächtnis“) bei Anfragen an Cloud-KI-Anbieter mitzuschicken. Standardmäßig deaktiviert.</span></label>
+      <label class="privacy-toggle"><input type="checkbox" id="shareTasksToggle"><span>Ich erlaube NEXUS, meine offenen Aufgaben bei Anfragen an Cloud-KI-Anbieter mitzuschicken (damit Fragen wie „Was steht heute an?“ funktionieren). Standardmäßig deaktiviert.</span></label>
+      <label class="privacy-toggle"><input type="checkbox" id="shareCalendarToggle"><span>Ich erlaube NEXUS, meine Termine der nächsten 14 Tage bei Anfragen an Cloud-KI-Anbieter mitzuschicken (damit Fragen wie „Habe ich morgen Zeit?“ funktionieren). Standardmäßig deaktiviert.</span></label>
+      <label class="field-label" for="eventLeadSelect">Erinnerung vor Terminen</label>
+      <select id="eventLeadSelect"><option value="0">Zum Beginn</option><option value="5">5 Minuten vorher</option><option value="15">15 Minuten vorher</option><option value="30">30 Minuten vorher</option><option value="60">1 Stunde vorher</option></select>
+      <div style="font-size:.78rem;opacity:.75;margin-top:8px">Bei lokaler KI (Ollama oder Server auf localhost) werden Erinnerungen und Aufgaben immer genutzt, weil sie den PC nicht verlassen.</div>
+      <div class="setup-note"><strong>Private Edition – kostenlos nutzbar:</strong> NEXUS erhebt keine Lizenz- oder Abonnementgebühr und enthält keine Werbung. Cloud-KI ist optional und verwendet ausschließlich deinen eigenen API-Key. Der jeweilige Anbieter kann dir API-Nutzung separat berechnen. API-Keys liegen im Windows-Schlüsselbund. Deine Nachrichten werden bei Auswahl einer Cloud-KI an diesen Anbieter übertragen; Erinnerungen nur, wenn du die Freigabe ausdrücklich aktivierst.</div>
+      <div class="setup-actions">
+        <button class="btn secondary" id="closeSetupButton" type="button">Schließen</button>
+        <button class="btn secondary" id="testConnectionButton" type="button">Verbindung testen</button>
+        <button class="btn secondary" id="deleteApiKeyButton" type="button">Gespeicherten API-Key löschen</button>
+        <button class="btn" id="saveAiSettingsButton" type="button">Einstellungen speichern</button>
+      </div>
+      <div class="setup-status" id="setupStatus" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="historyModal" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+    <section class="setup-card">
+      <h2 id="historyTitle">NEXUS – Gesprächsverlauf</h2>
+      <p class="setup-intro">Unterhaltungen werden lokal auf diesem PC gespeichert. Du kannst sie durchsuchen, erneut öffnen oder löschen.</p>
+      <label class="field-label" for="historySearch">Gespräche durchsuchen</label>
+      <input id="historySearch" type="search" placeholder="Suchbegriff eingeben ...">
+      <div class="memory-list" id="historyList"><div class="memory-empty">Noch keine gespeicherten Gespräche.</div></div>
+      <div class="setup-actions"><button class="btn secondary" id="clearHistoryButton" type="button">Alle Gespräche löschen</button><button class="btn secondary" id="closeHistoryButton" type="button">Schließen</button></div>
+      <div class="setup-status" id="historyStatus" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="memoryModal" role="dialog" aria-modal="true" aria-labelledby="memoryTitle">
+    <section class="setup-card">
+      <h2 id="memoryTitle">NEXUS – Persönliches Gedächtnis</h2>
+      <p class="setup-intro">Nur Informationen, die Sie hier ausdrücklich speichern, werden gemerkt. Sie können jeden Eintrag ansehen, bearbeiten oder löschen.</p>
+      <label class="field-label" for="memoryText">Neue Erinnerung oder Änderung</label>
+      <textarea id="memoryText" maxlength="1200" placeholder="Zum Beispiel: Ich bevorzuge kurze, klare Antworten."></textarea>
+      <div class="setup-actions"><button class="btn secondary" id="cancelMemoryEdit" type="button">Eingabe leeren</button><button class="btn" id="saveMemoryButton" type="button">Erinnerung speichern</button></div>
+      <div class="setup-status" id="memoryStatus" aria-live="polite"></div>
+      <div class="field-label">Gespeicherte Erinnerungen</div>
+      <div class="memory-list" id="memoryList"><div class="memory-empty">Noch keine Erinnerungen gespeichert.</div></div>
+      <div class="setup-actions"><button class="btn secondary" id="closeMemoryButton" type="button">Schließen</button></div>
+    </section>
+  </div>
+
+
+  <div class="modal-backdrop" id="tasksModal" role="dialog" aria-modal="true" aria-labelledby="tasksTitle">
+    <section class="setup-card">
+      <h2 id="tasksTitle">NEXUS – Aufgaben &amp; Erinnerungen</h2>
+      <p class="setup-intro">Plane Aufgaben und Termine. NEXUS speichert sie lokal auf diesem PC. Fälligkeitshinweise erscheinen, solange die App geöffnet ist.</p>
+      <label class="field-label" for="taskTitle">Aufgabe / Erinnerung</label>
+      <input id="taskTitle" maxlength="180" placeholder="Zum Beispiel: Rechnung überweisen">
+      <label class="field-label" for="taskDue">Erste Fälligkeit (Datum und Uhrzeit)</label>
+      <input id="taskDue" type="datetime-local">
+      <label class="field-label" for="taskRepeat">Wiederholung</label>
+      <select id="taskRepeat">
+        <option value="once">Einmalig</option>
+        <option value="daily">Täglich</option>
+        <option value="weekly">Wöchentlich</option>
+        <option value="monthly">Monatlich</option>
+      </select>
+      <div id="weeklyDays" style="display:none;margin-top:10px">
+        <div class="field-label">Wiederholen an diesen Wochentagen</div>
+        <div class="schedule-day-grid">
+          <label><input type="checkbox" class="task-weekday" value="1"> Mo</label>
+          <label><input type="checkbox" class="task-weekday" value="2"> Di</label>
+          <label><input type="checkbox" class="task-weekday" value="3"> Mi</label>
+          <label><input type="checkbox" class="task-weekday" value="4"> Do</label>
+          <label><input type="checkbox" class="task-weekday" value="5"> Fr</label>
+          <label><input type="checkbox" class="task-weekday" value="6"> Sa</label>
+          <label><input type="checkbox" class="task-weekday" value="0"> So</label>
+        </div>
+        <p class="setup-intro">Die Uhrzeit wird aus der ersten Fälligkeit übernommen.</p>
+      </div>
+      <label class="field-label" for="taskNotes">Notiz (optional)</label>
+      <textarea id="taskNotes" maxlength="1200" placeholder="Zusätzliche Details ..."></textarea>
+      <div class="setup-actions"><button class="btn secondary" id="resetTaskButton" type="button">Eingabe leeren</button><button class="btn" id="saveTaskButton" type="button">Aufgabe speichern</button></div>
+      <div class="setup-status" id="tasksStatus" aria-live="polite"></div>
+      <div class="field-label">Erinnerungsübersicht</div>
+      <div class="schedule-panel" id="reminderOverview" aria-live="polite">
+        <div class="schedule-heading"><strong>Fällige, kommende und überfällige Erinnerungen</strong><span>Die Übersicht wird beim Öffnen und nach Änderungen aktualisiert.</span></div>
+        <div id="reminderOverviewContent" class="memory-list"></div>
+      </div>
+      <div class="field-label">Deine Aufgaben</div>
+      <div class="memory-list" id="tasksList"><div class="memory-empty">Noch keine Aufgaben angelegt.</div></div>
+      <div class="setup-actions"><button class="btn secondary" id="closeTasksButton" type="button">Schließen</button></div>
+    </section>
+  </div>
+
+
+  <div class="modal-backdrop" id="calendarModal" role="dialog" aria-modal="true" aria-labelledby="calendarTitle">
+    <section class="setup-card calendar-card">
+      <h2 id="calendarTitle">NEXUS – Kalender</h2>
+      <p class="setup-intro">Deine Termine liegen nur auf diesem PC (verschlüsselt, wenn die Datenverschlüsselung an ist). Import und Export als .ics, damit du sie mit Handy oder Outlook austauschen kannst.</p>
+      <div class="cal-nav">
+        <button class="btn secondary" id="calPrev" type="button" aria-label="Vorheriger Monat">‹</button>
+        <strong id="calMonthLabel"></strong>
+        <button class="btn secondary" id="calNext" type="button" aria-label="Nächster Monat">›</button>
+        <button class="btn secondary" id="calToday" type="button">Heute</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="field-label" id="calDayLabel"></div>
+      <div class="memory-list" id="calDayList"></div>
+      <div class="setup-actions" style="justify-content:flex-start;flex-wrap:wrap">
+        <button class="btn" id="calNewButton" type="button">Neuer Termin</button>
+        <button class="btn secondary" id="calImportButton" type="button">Import (.ics)</button>
+        <button class="btn secondary" id="calExportButton" type="button">Export (.ics)</button>
+      </div>
+      <div class="cal-editor" id="calEditor" hidden>
+        <label class="field-label" for="calTitle">Titel</label>
+        <input id="calTitle" maxlength="180" placeholder="Zum Beispiel: Zahnarzt">
+        <label class="privacy-toggle"><input type="checkbox" id="calAllDay"><span>Ganztägig</span></label>
+        <div class="field-label">Beginn</div>
+        <div class="cal-row"><input id="calStartDate" type="date"><input id="calStartTime" type="time"></div>
+        <div class="field-label">Ende (leer = eine Stunde bzw. derselbe Tag)</div>
+        <div class="cal-row"><input id="calEndDate" type="date"><input id="calEndTime" type="time"></div>
+        <label class="field-label" for="calLocation">Ort</label>
+        <input id="calLocation" maxlength="200" placeholder="optional">
+        <label class="field-label" for="calNotes">Notizen</label>
+        <input id="calNotes" maxlength="2000" placeholder="optional">
+        <label class="field-label" for="calRepeat">Wiederholung</label>
+        <div class="cal-row">
+          <select id="calRepeat"><option value="none">Einmalig</option><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="monthly">Monatlich</option><option value="yearly">Jährlich</option></select>
+          <input id="calInterval" type="number" min="1" max="99" value="1" title="Alle n Einheiten" aria-label="Wiederholungsintervall">
+          <input id="calUntil" type="date" title="Wiederholen bis (optional)" aria-label="Wiederholen bis">
+        </div>
+        <div id="calSeriesHint" style="font-size:.78rem;opacity:.75;margin-top:6px" hidden>Dieser Termin gehört zu einer Serie: Änderungen und Löschen gelten für alle Wiederholungen.</div>
+        <div class="setup-actions" style="justify-content:flex-start;flex-wrap:wrap">
+          <button class="btn" id="calSaveButton" type="button">Speichern</button>
+          <button class="btn secondary" id="calDeleteButton" type="button" hidden>Löschen</button>
+          <button class="btn secondary" id="calCancelButton" type="button">Abbrechen</button>
+        </div>
+      </div>
+      <div class="setup-status" id="calStatus" aria-live="polite"></div>
+      <div class="setup-actions"><button class="btn secondary" id="closeCalendarButton" type="button">Schließen</button></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="automationModal" role="dialog" aria-modal="true" aria-labelledby="automationTitle">
+    <section class="setup-card">
+      <h2 id="automationTitle">NEXUS – Automatisierungen</h2>
+      <p class="setup-intro">Hier legst du fest, wann NEXUS dir morgens einen Überblick vorbereitet. Er ist zunächst deaktiviert und braucht deine ausdrückliche Zustimmung. Erinnerungen an Aufgaben und Termine kommen immer zu den eingetragenen Zeiten; ob sie auch als Windows-Benachrichtigung erscheinen, stellst du in der KI-Verwaltung ein.</p>
+      <label class="privacy-toggle"><input type="checkbox" id="autoMorning"><span><strong>Morgenüberblick</strong><br>Eine Übersicht deiner Aufgaben, Termine und Erinnerungen vorbereiten.</span></label>
+      <div class="schedule-panel" id="morningSchedulePanel">
+        <div class="schedule-heading"><strong>Morgenüberblick – Wochenplan</strong><span>Wähle die Tage und lege für jeden Tag eine Uhrzeit fest.</span></div>
+        <div class="weekday-grid">
+          <label class="weekday-row"><span><input type="checkbox" data-day="1"> Montag</span><input type="time" data-time="1" value="08:00" aria-label="Uhrzeit Montag" disabled></label>
+          <label class="weekday-row"><span><input type="checkbox" data-day="2"> Dienstag</span><input type="time" data-time="2" value="08:00" aria-label="Uhrzeit Dienstag" disabled></label>
+          <label class="weekday-row"><span><input type="checkbox" data-day="3"> Mittwoch</span><input type="time" data-time="3" value="08:00" aria-label="Uhrzeit Mittwoch" disabled></label>
+          <label class="weekday-row"><span><input type="checkbox" data-day="4"> Donnerstag</span><input type="time" data-time="4" value="08:00" aria-label="Uhrzeit Donnerstag" disabled></label>
+          <label class="weekday-row"><span><input type="checkbox" data-day="5"> Freitag</span><input type="time" data-time="5" value="08:00" aria-label="Uhrzeit Freitag" disabled></label>
+          <label class="weekday-row"><span><input type="checkbox" data-day="6"> Samstag</span><input type="time" data-time="6" value="08:00" aria-label="Uhrzeit Samstag" disabled></label>
+          <label class="weekday-row"><span><input type="checkbox" data-day="0"> Sonntag</span><input type="time" data-time="0" value="08:00" aria-label="Uhrzeit Sonntag" disabled></label>
+        </div>
+        <div class="setup-note">Der Überblick wird lokal aus deinen Aufgaben und Terminen erstellt. NEXUS muss dafür geöffnet sein. Es wird keine Cloud-KI angefragt.</div>
+      </div>
+      <div class="setup-note"><strong>Deine Kontrolle:</strong> Der Wochenplan wird nur ausgeführt, wenn auch „Morgenüberblick“ aktiviert ist. Dateiänderungen benötigen weiterhin eine separate Bestätigung.</div>
+      <div class="setup-actions"><button class="btn secondary" id="closeAutomationButton" type="button">Schließen</button><button class="btn" id="saveAutomationButton" type="button">Auswahl speichern</button></div>
+      <div class="setup-status" id="automationStatus" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="backupModal" role="dialog" aria-modal="true" aria-labelledby="backupTitle">
+    <section class="setup-card">
+      <h2 id="backupTitle">NEXUS – Datensicherung</h2>
+      <p class="setup-intro">Sichere deine Einstellungen, Aufgaben, Gespräche und ausdrücklich gespeicherten Erinnerungen in einer Datei. Du kannst sie später auf diesem PC wiederherstellen.</p>
+      <div class="setup-note"><strong>Wichtig:</strong> API-Schlüssel werden absichtlich nicht in die Sicherung geschrieben. Sie bleiben im Windows-Schlüsselbund und werden durch Updates nicht verändert. Nach einer Neuinstallation auf einem anderen PC musst du deine Schlüssel erneut hinterlegen. Beim Wiederherstellen werden die vorhandenen NEXUS-Daten durch den Stand der Sicherung ersetzt.</div>
+      <label class="field-label" for="backupPassword">Passwort für neue Sicherungen (mindestens 12 Zeichen)</label>
+      <input id="backupPassword" type="password" autocomplete="new-password" minlength="12" placeholder="Eigenes Sicherungspasswort">
+      <label class="field-label" for="backupPasswordConfirm">Passwort bestätigen</label>
+      <input id="backupPasswordConfirm" type="password" autocomplete="new-password" placeholder="Sicherungspasswort erneut eingeben">
+      <label class="field-label" for="restoreBackupPassword">Passwort zur Wiederherstellung</label>
+      <input id="restoreBackupPassword" type="password" autocomplete="current-password" placeholder="Bei alten Sicherungen leer lassen">
+      <div class="setup-note">Neue Sicherungen werden verschlüsselt. Das Passwort wird nicht in NEXUS gespeichert. Bei Verlust ist eine verschlüsselte Sicherung nicht wiederherstellbar. Ältere unverschlüsselte Sicherungen können weiterhin ohne Passwort geöffnet werden.</div>
+      <div class="setup-actions"><button class="btn" id="createBackupButton" type="button">Sicherung erstellen</button><button class="btn secondary" id="restoreBackupButton" type="button">Sicherung wiederherstellen</button><button class="btn secondary" id="closeBackupButton" type="button">Schließen</button></div>
+      <div class="setup-status" id="backupStatus" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <script src="lib/actions.js"></script>
+  <script src="lib/voice.js"></script>
+  <script src="lib/web.js"></script>
+  <script src="lib/calendar.js"></script>
+  <script src="ui/core-backup.js"></script>
+  <script src="ui/core.js"></script>
+  <script src="ui/settings.js"></script>
+  <script src="ui/memory-automation.js"></script>
+  <script src="ui/init.js"></script>
+  <script src="ui/orb.js"></script>
+  <script src="ui/pwa.js"></script>
+  <script src="ui/history.js"></script>
+  <script src="ui/tasks.js"></script>
+  <script src="ui/calendar.js"></script>
+  <script src="ui/morning.js"></script>
+  <script src="ui/chat.js"></script>
+  <script src="ui/voice-input.js"></script>
+</body>
+</html>

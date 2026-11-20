@@ -1,0 +1,17 @@
+{
+  "name": "nexus-assistent",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "test:ui": "node tests/ui-harness.cjs",
+    "test:unit": "node tests/unit.test.cjs",
+    "test": "node tests/unit.test.cjs && node tests/ui-harness.cjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

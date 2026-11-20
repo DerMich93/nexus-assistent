@@ -1,19 +1,5 @@
 # Änderungen
 
-## 1.1.0 – Arbeitsordner
-**Neu**
-- **Arbeitsordner** `Dokumente\Nexus-Arbeitsordner`: Dateien ansehen, im Explorer öffnen und mit 📎 an den Chat anhängen.
-- **Lesen:** Word (`.docx`) mit Überschriften, Aufzählungen und Tabellen; Excel (`.xlsx`) mit allen Tabellenblättern, Datumswerten und berechneten Formeln; `.txt`, `.md`, `.csv`, `.json` (UTF-8, UTF-16 und ältere ANSI-Dateien). Bis 30.000 Zeichen pro Datei, Kürzung wird gemeldet.
-- **Speichern:** neue Aktion `save_file` mit Vorschau-Karte und Bestätigung. Erzeugt echte Word-Dateien (Überschriften, Fettdruck, Aufzählungen, Tabellen) und Excel-Dateien (mehrere Blätter, Zahlen, Formeln; deutsche Funktionsnamen und Semikolons werden übersetzt). CSV mit BOM für Umlaute in Excel.
-- **Schutz im Code:** nur Dateien direkt im Ordner, nur erlaubte Endungen, keine Pfade, Verknüpfungen, reservierten Windows-Namen; Größenlimits; **nie überschreiben** (bei gleichem Namen `Name (2).ext`, abgesichert mit `create_new`); kein Löschen. Dateiinhalte gehen als fremde Daten an die KI; Cloud-KI nur mit eigener Freigabe; nach einer Websuche keine Datei-Vorschläge.
-- Abgeschnittene Antworten mit unvollständigem Vorschlag werden erkannt und ehrlich gemeldet.
-- Ohne neue Abhängigkeiten (ZIP über die eingebauten Compression-Streams).
-- 6 neue Rust-Tests, 15 Unit- und 22 Oberflächentests.
-
-**Geändert**
-- Längere Nachrichten erlaubt (40.000 Zeichen pro Nachricht, 100.000 im Verlauf), damit angehängte Dateien Platz haben.
-- Anthropic: Antwortlimit von 4096 auf 8192 Tokens erhöht (für längere Dokumente).
-
 ## 1.0.0 – Nexus Assistent
 Erste fertige Version. Sie fasst alle Entwicklungsstufen (0.7 bis 0.14) zusammen.
 

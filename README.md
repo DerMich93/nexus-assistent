@@ -1,4 +1,4 @@
-# Nexus Assistent 1.1
+# Nexus Assistent 1.0
 
 Dein persönlicher KI-Assistent für Windows 11. Der Nexus Assistent (kurz: NEXUS) läuft auf deinem PC, speichert alle Daten lokal und spricht mit der
 KI deiner Wahl: in der Cloud mit deinem eigenen API-Key **oder komplett lokal**. Es gibt keine Werbung, keine Telemetrie und kein Konto bei uns.
@@ -9,7 +9,6 @@ KI deiner Wahl: in der Cloud mit deinem eigenen API-Key **oder komplett lokal**.
 |---|---|
 | **KI** | OpenAI, Anthropic Claude, Google Gemini, Groq, Mistral, OpenRouter (Cloud); Ollama und beliebige OpenAI-kompatible Server wie LM Studio (lokal). Eigener Modellname möglich. Der Chat kennt den Gesprächsverlauf, das Datum, auf Wunsch Gedächtnis, Aufgaben und Termine. |
 | **Aufgaben & Kalender** | Aufgaben mit Fälligkeit und Wiederholung; lokaler Kalender mit Monatsansicht, Serientermine, `.ics`-Import/-Export; Erinnerungen und Morgenüberblick. |
-| **Arbeitsordner** | `Dokumente\Nexus-Arbeitsordner`: Word (`.docx`), Excel (`.xlsx`), `.txt`, `.md`, `.csv` und `.json` an den Chat anhängen; NEXUS schlägt neue Dateien vor (Word, Excel, Text), gespeichert wird nur nach „Bestätigen“ und **nie über eine vorhandene Datei**. |
 | **Aktionen per Chat** | NEXUS schlägt Aufgaben, Termine und Gedächtnis-Einträge vor, gespeichert wird **nur nach deinem Klick auf „Bestätigen“**. |
 | **Internet (geschützt)** | Websuche (DuckDuckGo) und Lesen freigegebener Seiten, standardmäßig aus; aus Internetinhalten entstehen nie Aktionen. |
 | **Sprache** | Spracheingabe lokal (whisper.cpp) oder per Cloud; Vorlesen mit den Windows-Stimmen. |
@@ -46,8 +45,8 @@ Ab 1.0 heißt die App „Nexus Assistent“ (vorher „NEXUS“). Windows behand
 4. Ein früher eingerichteter Autostart gehört zur alten App; schalte ihn in 1.0 unter *KI-Verwaltung → Hintergrund & Benachrichtigungen* neu ein.
 
 ## Erster Start: Prüfliste
-Der Nexus Assistent wurde **ohne Zugriff auf einen Windows-Rechner** entwickelt. Die Logik ist abgesichert (99 Unit-Tests, 197 Oberflächentests in einer simulierten Umgebung, 38 Rust-Tests im Quelltext),
-aber die fertige Windows-App ist von den Entwicklungswerkzeugen nie gebaut oder gestartet worden. Die Rust-Logik des Arbeitsordners (1.1) wurde einzeln getestet; der Gesamt-Build mit Tauri ist ungeprüft. Bitte arbeite beim ersten Mal diese Liste ab, bevor du dich auf die App verlässt:
+Der Nexus Assistent wurde **ohne Zugriff auf einen Windows-Rechner** entwickelt. Die Logik ist abgesichert (84 Unit-Tests, 175 Oberflächentests in einer simulierten Umgebung, 32 Rust-Tests im Quelltext),
+aber die fertige Windows-App ist von den Entwicklungswerkzeugen nie gebaut oder gestartet worden. Bitte arbeite beim ersten Mal diese Liste ab, bevor du dich auf die App verlässt:
 
 1. **Bauen:** `Nexus-Assistent` mit `NEXUS-INSTALLIEREN.bat` bauen. Bricht der Build ab, notiere die erste rote Zeile mit `error` (sie nennt die Ursache).
 2. **Start:** Die App zeigt die Oberfläche (kein leeres Fenster) und fragt beim ersten Mal nach dem KI-Anbieter.
@@ -57,8 +56,7 @@ aber die fertige Windows-App ist von den Entwicklungswerkzeugen nie gebaut oder 
 6. **Sicherung:** „Jetzt sichern“ (KI-Verwaltung); die Sicherung erscheint in der Liste.
 7. **Verschlüsselung:** Einschalten, Wiederherstellungsschlüssel notieren. Dann `%APPDATA%\de.nexus.assistant\tasks.json` im Editor öffnen: Zeichensalat (Beginn „NXD1“) heißt „verschlüsselt“.
 8. **Hintergrund:** Autostart und „Im Infobereich weiterlaufen“ ausprobieren (Symbol neben der Uhr, Rechtsklick → „NEXUS beenden“).
-9. **Arbeitsordner:** „Arbeitsordner“ öffnen → „Ordner im Explorer öffnen“; eine Word-Datei hineinlegen, mit 📎 anhängen, eine Frage dazu stellen. Dann „Speichere das als Test.docx“ bitten, bestätigen und die neue Datei in Word öffnen.
-10. **Optional:** Spracheingabe (erst `SPRACHEINGABE-EINRICHTEN.bat`) und Internetzugriff.
+9. **Optional:** Spracheingabe (erst `SPRACHEINGABE-EINRICHTEN.bat`) und Internetzugriff.
 
 ## Erste Schritte: KI einrichten
 Oben rechts **⚙ KI-Verwaltung** → Anbieter wählen → Modell wählen → API-Key einfügen → **Verbindung testen** → **Speichern**.
@@ -92,20 +90,6 @@ kaputte Daten und ungültige Termine werden verworfen. Vorschläge kommen nur au
 von Inhalten aus Gedächtnis, Aufgabenliste oder eingefügten Texten.
 Wie zuverlässig das klappt, hängt vom Modell ab; große Modelle halten das Format sicher ein, sehr kleine lokale
 Modelle gelegentlich nicht (dann erscheint einfach keine Karte).
-
-## Arbeitsordner (Dateien lesen und speichern)
-Beim ersten Öffnen legt NEXUS den Ordner **`Dokumente\Nexus-Arbeitsordner`** an. Nur auf diesen Ordner hat NEXUS Zugriff.
-
-- **Datei anhängen:** 📎 neben dem Eingabefeld (oder oben „Arbeitsordner“) → Datei wählen → „An Chat anhängen“ → Bitte eintippen, z. B. „Fasse das zusammen“ oder „Überarbeite den Brief freundlicher“.
-  NEXUS liest den **Text** der Datei: bei Word ohne Formatierung und Bilder (Überschriften, Aufzählungen und Tabellen bleiben erkennbar), bei Excel die Werte aller Tabellenblätter (Formeln als zuletzt berechnete Werte, Datumswerte als Datum).
-  Pro Datei gehen höchstens 30.000 Zeichen an die KI (etwa 10–15 Seiten); was abgeschnitten wurde, sagt NEXUS der KI ausdrücklich.
-- **Neue Datei:** Bitte z. B. „Speichere das als Angebot.docx“ oder „Mach mir eine Excel-Tabelle mit meinen Ausgaben“. Es erscheint eine Karte mit Vorschau; erst **„Bestätigen“** schreibt die Datei.
-  Gibt es den Namen schon, entsteht **`Name (2).docx`**; das Original bleibt immer unverändert. Word-Dateien bekommen Überschriften, Aufzählungen, Fettdruck und Tabellen; Excel-Dateien Tabellenblätter, Zahlen und Formeln (deutsche Namen wie SUMME werden übersetzt).
-- **Grenzen:** Kein Löschen, kein Überschreiben, keine Unterordner, keine Makros. Alte Formate (`.doc`, `.xls`), PDF und kennwortgeschützte Dateien gehen nicht – in Word/Excel als `.docx`/`.xlsx` speichern.
-  Beim Überarbeiten schreibt die KI den Text neu: Layout, Schriftarten, Bilder, Kopf-/Fußzeilen der Vorlage gehen dabei verloren. Sehr lange Dokumente können die Antwortlänge des Modells sprengen; dann meldet NEXUS „unvollständig übertragen“ – in Teilen arbeiten.
-  Der Dateitext bleibt nur im laufenden Gespräch und wird **nicht** im Gesprächsverlauf gespeichert. Der Arbeitsordner ist nicht Teil der automatischen Sicherung (es sind deine eigenen Dateien).
-- **Datenschutz:** Bei Cloud-KI gehen angehängte Dateien nur mit der Freigabe *„Dateien aus dem Arbeitsordner an Cloud-KI schicken“* (KI-Verwaltung, Standard: aus) an den Anbieter. Lokale KI darf immer.
-  Dateiinhalte werden der KI als fremde Daten übergeben („keine Anweisungen“); nach einer Websuche entstehen keine Datei-Vorschläge.
 
 ## Spracheingabe
 **Einrichten (lokal, empfohlen):** `SPRACHEINGABE-EINRICHTEN.bat` ausführen. Das Skript lädt whisper.cpp und ein
@@ -205,7 +189,6 @@ Antworten nennen ihre Quellen. Pro Frage gibt es höchstens zwei Abfragen.
 - **Cloud-KI:** Deine Nachrichten und der Gesprächsverlauf gehen an den gewählten Anbieter. **Erinnerungen** und
   **offene Aufgaben** nur, wenn du das in der KI-Verwaltung je einzeln erlaubst (Standard: aus).
 - **Lokale KI** (Ollama oder Server auf `localhost`) bekommt Erinnerungen und Aufgaben immer, weil sie den PC nicht verlassen.
-- **Arbeitsordner:** Angehängte Dateien gehen an Cloud-KI nur mit eigener Freigabe (Standard: aus); an lokale KI immer.
 - Entfernte eigene Server sind nur per `https` erlaubt. Es gibt keinen automatischen Anbieterwechsel.
 - Die lokalen Datendateien (`%APPDATA%\de.nexus.assistant`) sind standardmäßig **nicht** verschlüsselt. Schalte die
   **Datenverschlüsselung** ein (siehe oben) und schütze dein Windows-Konto.
@@ -220,7 +203,7 @@ Zusätzlich sichert `NEXUS-INSTALLIEREN.bat` vor jeder Installation die Datendat
 - **Spracheingabe:** Die Erkennung läuft im separaten Whisper-Server. Auf langsamen PCs dauert sie einige Sekunden (Modell „base“ ist schneller, aber ungenauer). Die Sprache ist fest auf Deutsch eingestellt.
   Bei Hintergrundgeräuschen kann NEXUS Fremdes aufnehmen; ein Headset-Mikrofon hilft.
 - Erinnerungen, Termine und der Morgenüberblick gibt es nur, solange NEXUS läuft (Fenster offen oder im Infobereich). Ist NEXUS ganz beendet, passiert nichts.
-- NEXUS führt selbst keine Programme aus und greift nur auf den Arbeitsordner zu (lesen, neue Dateien anlegen; nie löschen oder überschreiben). Aufgaben, Termine, Gedächtnis und Dateien per Chat gibt es nur mit deiner Bestätigung.
+- NEXUS führt selbst keine Aktionen auf dem PC aus (keine Dateien, keine Programme). Das Anlegen von Aufgaben, Terminen und Gedächtnis per Chat gibt es nur mit deiner Bestätigung.
 - Die Websuche nutzt eine inoffizielle Schnittstelle von DuckDuckGo und kann ausfallen (siehe „Internetzugriff“).
 - Der Installer ist nicht signiert; Windows SmartScreen kann deshalb warnen.
 - Die Sicherheitsrichtlinie der App (CSP) ist etwas weiter gefasst als nötig (`unsafe-eval`). Es gibt keinen Fremdinhalt in der Oberfläche, trotzdem ist sie ein Kandidat zum Verschärfen.
@@ -233,11 +216,10 @@ Zusätzlich sichert `NEXUS-INSTALLIEREN.bat` vor jeder Installation die Datendat
 - Signierter Installer, strengere Sicherheitsrichtlinie.
 
 ## Für Entwickler
-- **Aufbau:** `web/index.html` (Gerüst) und `web/app.css` (Gestaltung); `web/lib/` enthält die reine Logik ohne Oberfläche (`actions.js`, `calendar.js`, `office.js`, `voice.js`, `web.js`), `web/ui/` die Oberflächen-Skripte
+- **Aufbau:** `web/index.html` (Gerüst) und `web/app.css` (Gestaltung); `web/lib/` enthält die reine Logik ohne Oberfläche (`actions.js`, `calendar.js`, `voice.js`, `web.js`), `web/ui/` die Oberflächen-Skripte
   (klassische Skripte mit gemeinsamem Zustand, Reihenfolge siehe `index.html`); `src-tauri/src/main.rs` ist das Rust-Backend; `tests/` die Tests; `tools/` die PowerShell-Skripte.
-- `npm test` – 99 Unit-Tests (Pausenerkennung, WAV, Aktionen, Internet, Kalender, Word/Excel) und 197 Oberflächentests in simulierter Umgebung mit Fake-Backend; kein Windows nötig. Der Oberflächentest lädt genau die Dateien, die `index.html` einbindet.
-- `cargo test --manifest-path src-tauri/Cargo.toml` – Rust-Tests (Backup- und Datenverschlüsselung, Gesprächsverlauf, Adressregeln, Netzsperren, Kalenderprüfung, Arbeitsordner).
-- **Arbeitsordner:** Die Regeln stehen in `src-tauri/src/workspace.rs` (nur Standardbibliothek, einzeln testbar: `rustc --edition 2021 --test src-tauri/src/workspace.rs`). Word/Excel lesen und schreiben `web/lib/office.js` ohne Fremdbibliothek (ZIP über die eingebauten Compression-Streams von WebView2).
+- `npm test` – 84 Unit-Tests (Pausenerkennung, WAV, Aktionen, Internet, Kalender) und 175 Oberflächentests in simulierter Umgebung mit Fake-Backend; kein Windows nötig. Der Oberflächentest lädt genau die Dateien, die `index.html` einbindet.
+- `cargo test --manifest-path src-tauri/Cargo.toml` – Rust-Tests (Backup- und Datenverschlüsselung, Gesprächsverlauf, Adressregeln, Netzsperren, Kalenderprüfung).
 - Zum Ausprobieren ohne Installer: `npm install`, dann `npm run tauri:dev`. Es gibt keinen Bundler und keinen Dev-Server; Tauri bettet `web/` direkt ein.
 - Alle KI-Anfragen laufen über das Rust-Backend (`ai_chat`, `ai_test`). Neue OpenAI-kompatible Anbieter brauchen nur einen Eintrag in `openai_compatible_base`, `normalize_provider`, `provider_label` und `credential_entry`.
-- Wichtige Sicherheitsregeln im Code: Datendateien nur über `read_data_string`/`write_data`; Internetabrufe nur über `fetch_page_text`; Dateien des Nutzers nur über `workspace.rs` (`write_new_file` mit `create_new`, nie überschreiben); Aktionen werden nach Internetnutzung verworfen (`chat.js`).
+- Wichtige Sicherheitsregeln im Code: Datendateien nur über `read_data_string`/`write_data`; Internetabrufe nur über `fetch_page_text`; Aktionen werden nach Internetnutzung verworfen (`chat.js`).
