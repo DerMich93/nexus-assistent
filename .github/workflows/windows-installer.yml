@@ -71,6 +71,22 @@ jobs:
           $conf | ConvertTo-Json -Depth 20 | Set-Content $path -Encoding utf8
           Write-Host "Updates werden signiert und unter $env:RELEASE_REPO veroeffentlicht."
 
+      - name: Create release tag in release repository
+        if: env.HAS_SIGNING == 'true' && env.HAS_RELEASE_TOKEN == 'true'
+        shell: pwsh
+        env:
+          TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          # Der Tag wird vorab per Git angelegt; dann muss die Release-API keinen Commit aus dem privaten Repo kennen.
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          git clone --depth 1 "https://x-access-token:$($env:TOKEN)@github.com/$($env:RELEASE_REPO).git" release-repo
+          if ($LASTEXITCODE -ne 0) { throw 'Release-Repository nicht erreichbar: RELEASES_TOKEN braucht Zugriff auf dieses Repository.' }
+          Set-Location release-repo
+          if (git ls-remote --tags origin "refs/tags/v$v") { Write-Host "Tag v$v existiert bereits."; exit 0 }
+          git tag "v$v"
+          git push origin "v$v"
+          if ($LASTEXITCODE -ne 0) { throw 'Tag konnte nicht angelegt werden: RELEASES_TOKEN braucht Contents: Read and write.' }
+
       - name: Build and publish signed release
         if: env.HAS_SIGNING == 'true' && env.HAS_RELEASE_TOKEN == 'true'
         uses: tauri-apps/tauri-action@v0
