@@ -82,6 +82,8 @@ jobs:
           owner: ${{ github.repository_owner }}
           repo: ${{ vars.RELEASE_REPO_NAME || 'nexus-assistent-releases' }}
           tagName: v__VERSION__
+          # Der Tag entsteht im Release-Repository auf dessen Hauptzweig (der Commit des privaten Repos existiert dort nicht).
+          commitish: main
           releaseName: Nexus Assistent __VERSION__
           releaseBody: Neue Version des Nexus Assistenten. Änderungen siehe CHANGELOG. Installation in NEXUS unter KI-Verwaltung → Updates.
           releaseDraft: false
