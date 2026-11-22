@@ -88,25 +88,54 @@ jobs:
           git push origin "v$v"
           if ($LASTEXITCODE -ne 0) { throw 'Tag konnte nicht angelegt werden: RELEASES_TOKEN braucht Contents: Read and write.' }
 
-      - name: Build and publish signed release
+      - name: Build signed installers
         if: env.HAS_SIGNING == 'true' && env.HAS_RELEASE_TOKEN == 'true'
-        uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          owner: ${{ github.repository_owner }}
-          repo: ${{ vars.RELEASE_REPO_NAME || 'nexus-assistent-releases' }}
-          tagName: v__VERSION__
-          # Der Tag entsteht im Release-Repository auf dessen Hauptzweig (der Commit des privaten Repos existiert dort nicht).
-          commitish: main
-          releaseName: Nexus Assistent __VERSION__
-          releaseBody: Neue Version des Nexus Assistenten. Änderungen siehe CHANGELOG. Installation in NEXUS unter KI-Verwaltung → Updates.
-          releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: true
-          tauriScript: npx tauri
+        run: npm run tauri:build
+
+      - name: Publish release with latest.json
+        if: env.HAS_SIGNING == 'true' && env.HAS_RELEASE_TOKEN == 'true'
+        shell: pwsh
+        env:
+          TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          # Veroeffentlicht Installer, Signatur und latest.json im oeffentlichen Release-Repository (Tag existiert bereits).
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tag = "v$v"
+          $headers = @{ Authorization = "Bearer $($env:TOKEN.Trim())"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $api = "https://api.github.com/repos/$($env:RELEASE_REPO)"
+          $exe = Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+          $msi = Get-ChildItem 'src-tauri/target/release/bundle/msi/*.msi' | Select-Object -First 1
+          if (-not $exe -or -not (Test-Path "$($exe.FullName).sig")) { throw 'Installer oder Signatur (.sig) fehlt.' }
+          $exeName = "Nexus-Assistent_${v}_x64-setup.exe"
+          $msiName = "Nexus-Assistent_${v}_x64_de.msi"
+          $latest = [ordered]@{
+            version = $v
+            notes = "Nexus Assistent $v - Aenderungen siehe CHANGELOG."
+            pub_date = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            platforms = [ordered]@{ 'windows-x86_64' = [ordered]@{
+              signature = (Get-Content "$($exe.FullName).sig" -Raw).Trim()
+              url = "https://github.com/$($env:RELEASE_REPO)/releases/download/$tag/$exeName" } }
+          }
+          $latestPath = Join-Path $env:RUNNER_TEMP 'latest.json'
+          $latest | ConvertTo-Json -Depth 5 | Set-Content $latestPath -Encoding utf8NoBOM
+          try { $release = Invoke-RestMethod -Headers $headers -Uri "$api/releases/tags/$tag" }
+          catch {
+            $body = @{ tag_name = $tag; name = "Nexus Assistent $v"; body = 'Neue Version des Nexus Assistenten. Installation in NEXUS unter KI-Verwaltung -> Updates.'; draft = $false; prerelease = $false } | ConvertTo-Json
+            $release = Invoke-RestMethod -Method Post -Headers $headers -Uri "$api/releases" -Body $body -ContentType 'application/json'
+          }
+          $files = @(@{ path = $exe.FullName; name = $exeName }, @{ path = $latestPath; name = 'latest.json' })
+          if ($msi) { $files += @{ path = $msi.FullName; name = $msiName } }
+          foreach ($f in $files) {
+            $old = $release.assets | Where-Object { $_.name -eq $f.name }
+            if ($old) { Invoke-RestMethod -Method Delete -Headers $headers -Uri "$api/releases/assets/$($old.id)" | Out-Null }
+            $uri = "https://uploads.github.com/repos/$($env:RELEASE_REPO)/releases/$($release.id)/assets?name=$([uri]::EscapeDataString($f.name))"
+            Invoke-RestMethod -Method Post -Headers $headers -Uri $uri -InFile $f.path -ContentType 'application/octet-stream' | Out-Null
+            Write-Host "Hochgeladen: $($f.name)"
+          }
+          Write-Host "Release: $($release.html_url)"
 
       - name: Build installers (without publishing)
         if: env.HAS_SIGNING != 'true' || env.HAS_RELEASE_TOKEN != 'true'
