@@ -42,6 +42,21 @@ jobs:
       - name: Run Rust unit tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Check update setup
+        shell: pwsh
+        env:
+          S1: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          S2: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD != '' }}
+          S3: ${{ secrets.RELEASES_TOKEN != '' }}
+          V1: ${{ vars.TAURI_UPDATER_PUBKEY != '' }}
+        run: |
+          # Zeigt nur, OB etwas eingetragen ist - nie den Inhalt.
+          function Show($name, $kind, $ok) { if ($ok -eq 'true') { Write-Host "OK      $kind $name" } else { Write-Host "FEHLT   $kind $name" } }
+          Show 'TAURI_SIGNING_PRIVATE_KEY' 'Secret  ' $env:S1
+          Show 'TAURI_SIGNING_PRIVATE_KEY_PASSWORD' 'Secret  ' $env:S2
+          Show 'RELEASES_TOKEN' 'Secret  ' $env:S3
+          Show 'TAURI_UPDATER_PUBKEY' 'Variable' $env:V1
+
       - name: Configure signed updates
         if: env.HAS_SIGNING == 'true'
         shell: pwsh
