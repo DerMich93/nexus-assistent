@@ -79,9 +79,10 @@ jobs:
         run: |
           # Der Tag wird vorab per Git angelegt; dann muss die Release-API keinen Commit aus dem privaten Repo kennen.
           $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          git clone --depth 1 "https://x-access-token:$($env:TOKEN)@github.com/$($env:RELEASE_REPO).git" release-repo
+          $token = $env:TOKEN.Trim()   # eingefügte Secrets enthalten oft einen Zeilenumbruch am Ende
+          git clone --depth 1 "https://x-access-token:$token@github.com/$($env:RELEASE_REPO).git" "$env:RUNNER_TEMP/release-repo"
           if ($LASTEXITCODE -ne 0) { throw 'Release-Repository nicht erreichbar: RELEASES_TOKEN braucht Zugriff auf dieses Repository.' }
-          Set-Location release-repo
+          Set-Location "$env:RUNNER_TEMP/release-repo"
           if (git ls-remote --tags origin "refs/tags/v$v") { Write-Host "Tag v$v existiert bereits."; exit 0 }
           git tag "v$v"
           git push origin "v$v"
